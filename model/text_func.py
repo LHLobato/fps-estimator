@@ -64,6 +64,9 @@ KEY_ALIASES = {
 }
 
 def format_gpu_features(row: pd.Series) -> str:
+    """
+    Helper function that formats the feature string in order to reduce LLM tokens consume.
+    """
     parts = []
     for full_key, alias in KEY_ALIASES.items():
         val = row.get(full_key, None)
@@ -73,6 +76,13 @@ def format_gpu_features(row: pd.Series) -> str:
     return " | ".join(parts)
 
 def retrieval_gpu_feat(gpu_name: str, gpu_df: pd.DataFrame) -> str:
+    """
+    The Function will retrieve all related features of certain GPU from the database.
+    *gpu_name: parameter that resolves the gpu_name.
+    *gpu_df: pandas DataFrame object with the GPU related data.
+
+    return -> formated gpu features.
+    """
     gpu_name = gpu_name.lower()
     col = gpu_df['Name'].str.lower()
 
@@ -84,6 +94,7 @@ def retrieval_gpu_feat(gpu_name: str, gpu_df: pd.DataFrame) -> str:
         raise ValueError(f"GPU '{gpu_name}' não encontrada na base.")
 
     row = gpu_df.loc[mask, gpu_features].iloc[0]
+
     return format_gpu_features(row)
 
 cpu_features = [
@@ -108,6 +119,9 @@ CPU_KEY_ALIASES = {
 }
 
 def format_cpu_features(row: pd.Series) -> str:
+    """
+    Helper function that formats the feature string in order to reduce LLM tokens consume.
+    """
     parts = []
     for key, alias in CPU_KEY_ALIASES.items():
         val = row.get(key, None)
@@ -117,8 +131,16 @@ def format_cpu_features(row: pd.Series) -> str:
     return " | ".join(parts)
 
 def retrieval_cpu_feat(cpu_name: str, cpu_df: pd.DataFrame) -> str:
+    """
+    The Function will retrieve all related features of certain CPU from the database
+    *cpu_name: parameter that resolves the cpu_name
+    *cpu_df: pandas DataFrame object with the CPU related data
+
+    return -> formated cpu features.
+    """
+
     cpu_name = cpu_name.lower()
-    col = cpu_df['name'].str.lower()  # coluna 'name' minúscula nessa base
+    col = cpu_df['name'].str.lower()
 
     mask = col == cpu_name
     if not mask.any():
