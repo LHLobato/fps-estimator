@@ -10,6 +10,20 @@ load_dotenv()
 
 
 def send_question(components:list, game:str, preset:str, resolution:str) -> str:
+    """
+    Function that connects application with the GOOGLE API, receiving the related to build
+    the LLM prompt.
+
+    *components: list with the user's hardaware components
+    *game: the game name that will be estimated
+    *preset: graphics quality
+    *resolution: image resolution that user's want to run the game
+
+    return -> JSON formated to string, with avg, min and max fps.
+    """
+
+
+
     client = genai.Client(api_key=os.environ.get("GOOGLE_API_KEY"))
 
     config = types.GenerateContentConfig(
