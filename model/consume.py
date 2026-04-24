@@ -4,16 +4,12 @@ import os
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
-from pydantic import BaseModel
-
+from schemas import BenchmarkResult
+from text_func import retrieval_gpu_feat, retrieval_cpu_feat
 load_dotenv()
 
-class BenchmarkResult(BaseModel):
-    avg_fps: int
-    min_fps: int
-    max_fps: int
 
-def send_question(components:str, game:str, preset:str, resolution:str) -> str:
+def send_question(components:list, game:str, preset:str, resolution:str) -> str:
     client = genai.Client(api_key=os.environ.get("GOOGLE_API_KEY"))
 
     config = types.GenerateContentConfig(
@@ -32,11 +28,19 @@ def send_question(components:str, game:str, preset:str, resolution:str) -> str:
         response_schema=BenchmarkResult,
         )
 
+    gpu_name = components[0]
+    cpu_name = components[1]
+    ram = components[2]
+
+    gpu_prompted = f"{gpu_name} | {retrieval_gpu_feat(gpu_name, pd.read_csv("../data/gpu_1986-2026_normalized_dates.csv", index_col=False))}"
+
+    cpu_prompted = f"{cpu_name} | {retrieval_cpu_feat(cpu_name, pd.read_csv("../data/data_cleaned.csv", index_col=False))}"
+
     prompt = (
-        f"Hardware: {components} \n"
-        f"Game: {game} \n"
-        f"Resolution: {resolution}\n"
-        f"Preset: {preset}"
+        f"[Hardware] {gpu_prompted} | {cpu_prompted} | {ram}\n"
+        f"[Game] {game} \n"
+        f"[Resolution] {resolution}\n"
+        f"[Preset] {preset}"
     )
 
     response = client.models.generate_content(
@@ -47,9 +51,9 @@ def send_question(components:str, game:str, preset:str, resolution:str) -> str:
 
     return response.text
 
-components = "RTX 5060, Ryzen 7 5700X, 16GB RAM DDR4"
+components = ["RTX 5060", "Ryzen 7 5700X", "16GB RAM DDR4"]
 game = "Resident Evil 4 Remake"
 preset = "High"
-resolution = "1080p (No Ray Tracing)"
-
+resolution = "4K"
 print(send_question(components, game, preset, resolution))
+#print(retrieval_cpu_feat("i3-10100F", pd.read_csv("../data/data_cleaned.csv")))
