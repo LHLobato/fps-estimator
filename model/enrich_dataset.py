@@ -30,13 +30,8 @@ CPU_OUTPUT = "../data/tpu_cpus_enriched.csv"
 
 MODEL = "gemini-2.5-flash"
 
-# Pausa entre chamadas à API para evitar rate limit (segundos)
-# Com limite de 20 req/dia, usar batch grande e delay longo
 DELAY_BETWEEN_CALLS = 120  # 2 minutos entre requisições
 
-# Tamanho do batch: quantas CPUs enviar por chamada à API
-# Aumentado para reduzir número total de requisições
-# Com 2852 CPUs e batch=150, teremos ~19 requisições (dentro do limite de 20/dia)
 BATCH_SIZE = 150
 
 # ─── CPU: colunas que queremos preencher ─────────────────────────────────────
@@ -44,7 +39,13 @@ BATCH_SIZE = 150
 CPU_TARGET_COLS = [
     "tdp",      # TDP em watts
     "price",    # Preço
+    "speed",   # Velocidade base em MHz (pode ser 0 se não disponível)
     "turbo",    # Velocidade turbo em MHz
+    "cpuCount", # Número de núcleos físicos
+    "cores",    # Número de threads
+    "l1_cache", # Cache L1 em KB
+    "l2_cache", # Cache L2 em KB
+    "l3_cache", # Cache L3 em MB
 ]
 
 
@@ -147,7 +148,13 @@ def build_cpu_prompt(missing_fields_data: list) -> str:
     fields_desc = {
         "tdp": "consumo de potência em watts (ex: 65, 105, 140) ou 0 se desconhecido",
         "price": "preço em USD (ex: 199, 389, 499) ou 0 se desconhecido",
+        "speed": "velocidade base em MHz (ex: 3200, 3600, 4000) ou 0 se desconhecido",
         "turbo": "frequência turbo em MHz (ex: 4000, 4500, 5000) ou 0 se desconhecido",
+        "cpuCount": "número de núcleos físicos (ex: 4, 6, 8) ou 0 se desconhecido",
+        "cores": "número de threads (ex: 8, 12, 16) ou 0 se desconhecido",
+        "l1_cache": "cache L1 em KB (ex: 32, 64, 128) ou 0 se desconhecido",
+        "l2_cache": "cache L2 em KB (ex: 256, 512, 1024) ou 0 se desconhecido",
+        "l3_cache": "cache L3 em MB (ex: 8, 16, 32) ou 0 se desconhecido",
     }
     
     # Construir lista de campos dinâmicos
@@ -181,22 +188,24 @@ def enrich_cpus(batch_size: int = BATCH_SIZE, delay: float = DELAY_BETWEEN_CALLS
     print("\n" + "="*60)
     print("  ENRIQUECENDO DATASET DE CPUs")
     print("="*60)
-    print(f"\n⚠ Aviso: API gratuita tem limite de ~20 req/dia")
     print(f"  Batch size: {batch_size} | Delay: {delay}s entre requisições")
     print(f"  Processamento será LENTO mas respeitará os limites da API\n")
 
     df = pd.read_csv(CPU_INPUT)
     print(f"Dataset carregado: {len(df)} linhas")
 
-    # Remove linhas de "No CPUs found"
+    # Garante que todas as colunas alvo existem 
+    for col in CPU_TARGET_COLS:
+        if col not in df.columns:
+            df[col] = 0
+    
     before = len(df)
     df = df[~df['name'].str.contains("No CPUs found", na=False)].copy()
     print(f"Removidas {before - len(df)} linhas de 'No CPUs found'")
 
     # Identifica linhas que precisam de enriquecimento
-    # Uma linha precisa de enriquecimento se alguma coluna-alvo tiver valor 0
     needs_enrichment = df[
-        (df['tdp'] == 0) | (df['price'] == 0) | (df['turbo'] == 0)
+        (df['tdp'] == 0) | (df['price'] == 0) | (df['turbo'] == 0) | (df['speed'] == 0) | (df['cpuCount'] == 0) | (df['cores'] == 0) | (df['l1_cache'] == 0) | (df['l2_cache'] == 0) | (df['l3_cache'] == 0)
     ].index.tolist()
 
     all_indices = needs_enrichment
@@ -213,52 +222,78 @@ def enrich_cpus(batch_size: int = BATCH_SIZE, delay: float = DELAY_BETWEEN_CALLS
     total_time_minutes = (num_batches * delay) / 60
     
     print(f"Batches: {num_batches} | Tempo estimado: ~{total_time_minutes:.1f} minutos")
-    print(f"(API gratuita permite apenas ~20 requisições por dia)\n")
     
     filled = 0
     skipped = 0
 
     for batch_num, batch_idx in enumerate(tqdm(batches, desc="Processando batches")):
-        # Preparar dados com campos faltantes (otimizado para tokens)
+        # Preparar dados com campos faltantes
         batch_data = [df.loc[idx].to_dict() for idx in batch_idx]
         batch_names = [d['name'] for d in batch_data]
         missing_fields_data = get_missing_fields(batch_data, batch_names, CPU_TARGET_COLS)
         
+        batch_filled = 0
+        batch_skipped = 0
+        batch_details = []
+        batch_status = ""
+        
         if not missing_fields_data:
             # Todos os itens do batch já têm dados completos
-            continue
-        
-        prompt = build_cpu_prompt(missing_fields_data)
+            batch_status = "SKIP - Dados já completos"
+        else:
+            prompt = build_cpu_prompt(missing_fields_data)
+            raw = call_llm(prompt)
+            
+            if not raw:
+                batch_skipped = len(missing_fields_data)
+                skipped += batch_skipped
+                batch_status = "ERRO - Sem resposta da API"
+            else:
+                results = safe_parse_json(raw)
+                if not isinstance(results, list):
+                    batch_skipped = len(batch_idx)
+                    skipped += batch_skipped
+                    batch_status = "ERRO - Resposta inválida do LLM"
+                else:
+                    # Indexa resultados pelo nome
+                    results_map = {r.get("name", ""): r for r in results if isinstance(r, dict)}
 
-        raw = call_llm(prompt)
-        if not raw:
-            skipped += len(missing_fields_data)
-            continue
+                    for idx in batch_idx:
+                        cpu_name = df.at[idx, 'name']
+                        result = results_map.get(cpu_name)
+                        if not result:
+                            batch_skipped += 1
+                            skipped += 1
+                            continue
 
-        results = safe_parse_json(raw)
-        if not isinstance(results, list):
-            print(f"  ⚠ Batch {batch_num+1}: resposta inválida do LLM")
-            skipped += len(batch_idx)
-            continue
+                        batch_filled += 1
+                        filled += 1
+                        
+                        # Rastreia quais campos foram preenchidos neste item
+                        filled_fields = {}
+                        for col in ['tdp', 'price', 'turbo', 'speed', 'cpuCount', 'cores', 'l1_cache', 'l2_cache', 'l3_cache']:
+                            current_val = df.at[idx, col]
+                            result_val = result.get(col)
+                            # Preenche se o campo atual é 0 e o LLM forneceu um valor não-zero
+                            if current_val == 0 and result_val is not None and result_val != 0:
+                                df.at[idx, col] = result_val
+                                filled_fields[col] = result_val
+                        
+                        batch_details.append({
+                            'cpu': cpu_name,
+                            'filled': filled_fields
+                        })
+                    
+                    batch_status = "OK"
 
-        # Indexa resultados pelo nome
-        results_map = {r.get("name", ""): r for r in results if isinstance(r, dict)}
-
-        for idx in batch_idx:
-            cpu_name = df.at[idx, 'name']
-            result = results_map.get(cpu_name)
-            if not result:
-                skipped += 1
-                continue
-
-            filled += 1
-            # Preenche campos com valor 0 (faltantes) com os dados do LLM
-            for col in ['tdp', 'price', 'turbo']:
-                current_val = df.at[idx, col]
-                result_val = result.get(col)
-                # Preenche se o campo atual é 0 e o LLM forneceu um valor não-zero
-                if current_val == 0 and result_val is not None and result_val != 0:
-                    df.at[idx, col] = result_val
+        # Print de debug ao fim do batch (SEMPRE EXECUTADO)
+        print(f"\n📊 Batch {batch_num+1}/{num_batches} [{batch_status}]:")
+        print(f"   ✓ Preenchidas: {batch_filled} | ✗ Skipped: {batch_skipped}")
+        if batch_details:
+            print(f"   Detalhes:")
+            for item in batch_details:
+                fields_str = ", ".join([f"{k}={v}" for k, v in item['filled'].items()])
+                print(f"     • {item['cpu']}: {fields_str if fields_str else '(nenhum campo preenchido)'}")
 
         time.sleep(delay)
 
@@ -270,9 +305,9 @@ def enrich_cpus(batch_size: int = BATCH_SIZE, delay: float = DELAY_BETWEEN_CALLS
     print(f"  Linhas sem resposta: {skipped}")
     print(f"  Arquivo salvo: {CPU_OUTPUT}")
 
-    # Relatório de zeros restantes (dados faltantes)
+    # Relatório de dados faltantes
     print("\nValores faltantes (zeros) restantes nas colunas principais:")
-    for col in ['tdp', 'price', 'turbo']:
+    for col in ['tdp', 'price', 'turbo', 'speed', 'cpuCount', 'cores', 'l1_cache', 'l2_cache', 'l3_cache']:
         n = (df[col] == 0).sum()
         print(f"  {col}: {n}")
 
