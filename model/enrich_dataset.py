@@ -10,7 +10,7 @@ Requer:
     pip install python-dotenv google-generativeai pandas tqdm
     Arquivo .env com variável GOOGLE_API_KEY
 """
-
+import numpy as np
 import os
 import json
 import time
@@ -42,9 +42,9 @@ BATCH_SIZE = 150
 # ─── CPU: colunas que queremos preencher ─────────────────────────────────────
 # Colunas com valores 0 são consideradas faltantes
 CPU_TARGET_COLS = [
-    "cache_l1",      # TDP em watts
-    "cache_l2",    # Preço
-    "cache_l3",    # Velocidade turbo em MHz
+    "cache_l1",
+    "cache_l2",
+    "cache_l3",
 ]
 
 
@@ -145,8 +145,8 @@ def get_missing_fields(data_list: list, names: list, required_fields: list) -> l
 def build_cpu_prompt(missing_fields_data: list) -> str:
     """Constrói prompt dinâmico com apenas os campos faltantes."""
     fields_desc = {
-        "cache_l1":"quantidade de memória cache l1 em MB"
-        "cache_l2":"quantidade de memória cache l2 em MB"
+        "cache_l1":"quantidade de memória cache l1 em MB",
+        "cache_l2":"quantidade de memória cache l2 em MB",
         "cache_l3":"quantidade de memória cache l3 em MB"
 
     }
@@ -160,7 +160,6 @@ def build_cpu_prompt(missing_fields_data: list) -> str:
     return f"""Você é um especialista em processadores de computadores.
 
 Para cada CPU abaixo, forneça APENAS os campos faltantes listados. Se não souber um valor, use 0.
-
 CPUs com campos faltantes:
 {fields_list}
 
@@ -202,7 +201,7 @@ def enrich_cpus(batch_size: int = BATCH_SIZE, delay: float = DELAY_BETWEEN_CALLS
     # Identifica linhas que precisam de enriquecimento
     # Uma linha precisa de enriquecimento se alguma coluna-alvo tiver valor 0
     needs_enrichment = df[
-        (df['tdp'] == 0) | (df['price'] == 0) | (df['turbo'] == 0)
+        (df['cache_l1'] == 0) | (df['cache_l2'] == 0) | (df['cache_l3'] == 0)
     ].index.tolist()
 
     all_indices = needs_enrichment
@@ -242,6 +241,7 @@ def enrich_cpus(batch_size: int = BATCH_SIZE, delay: float = DELAY_BETWEEN_CALLS
             continue
 
         results = safe_parse_json(raw)
+        print(results)
         if not isinstance(results, list):
             print(f"  ⚠ Batch {batch_num+1}: resposta inválida do LLM")
             skipped += len(batch_idx)
@@ -259,7 +259,7 @@ def enrich_cpus(batch_size: int = BATCH_SIZE, delay: float = DELAY_BETWEEN_CALLS
 
             filled += 1
             # Preenche campos com valor 0 (faltantes) com os dados do LLM
-            for col in ['tdp', 'price', 'turbo']:
+            for col in ['cache_l1', 'cache_l2', 'cache_l3']:
                 current_val = df.at[idx, col]
                 result_val = result.get(col)
                 # Preenche se o campo atual é 0 e o LLM forneceu um valor não-zero
@@ -278,7 +278,7 @@ def enrich_cpus(batch_size: int = BATCH_SIZE, delay: float = DELAY_BETWEEN_CALLS
 
     # Relatório de zeros restantes (dados faltantes)
     print("\nValores faltantes (zeros) restantes nas colunas principais:")
-    for col in ['tdp', 'price', 'turbo']:
+    for col in ['cache_l1', 'cache_l2', 'cache_l3']:
         n = (df[col] == 0).sum()
         print(f"  {col}: {n}")
 
