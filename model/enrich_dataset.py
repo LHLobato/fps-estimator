@@ -27,24 +27,26 @@ load_dotenv()
 
 CPU_INPUT  = "../data/tpu_cpus_enriched.csv"
 CPU_OUTPUT = "../data/tpu_cpus_enriched-final.csv"
+CHECKPOINT_FILE = "../data/enrichment_checkpoint.json"
 
-MODEL = "gemini-2.5-flash"
+MODEL = "gemini-2.5-flash-lite"
 
-# Pausa entre chamadas à API para evitar rate limit (segundos)
-# Com limite de 20 req/dia, usar batch grande e delay longo
 DELAY_BETWEEN_CALLS = 120  # 2 minutos entre requisições
 
-# Tamanho do batch: quantas CPUs enviar por chamada à API
-# Aumentado para reduzir número total de requisições
-# Com 2852 CPUs e batch=150, teremos ~19 requisições (dentro do limite de 20/dia)
-BATCH_SIZE = 150
+BATCH_SIZE = 216
 
 # ─── CPU: colunas que queremos preencher ─────────────────────────────────────
 # Colunas com valores 0 são consideradas faltantes
 CPU_TARGET_COLS = [
-    "cache_l1",
-    "cache_l2",
-    "cache_l3",
+    "tdp",      # TDP em watts
+    "price",    # Preço
+    "speed",   # Velocidade base em MHz (pode ser 0 se não disponível)
+    "turbo",    # Velocidade turbo em MHz
+    "cpuCount", # Número de núcleos físicos
+    "cores",    # Número de threads
+    "l1_cache", # Cache L1 em KB
+    "l2_cache", # Cache L2 em KB
+    "l3_cache", # Cache L3 em MB
 ]
 
 
@@ -52,7 +54,7 @@ CPU_TARGET_COLS = [
 # Helpers
 # ──────────────────────────────────────────────────────────────────────────────
 
-def setup_client():
+def setup_api_key():
     """Configura o cliente Google Generative AI com chave do .env"""
     api_key = os.getenv("GOOGLE_API_KEY")
     if not api_key:
@@ -62,16 +64,16 @@ def setup_client():
         )
     genai.configure(api_key=api_key)
 
-
 def call_llm(prompt: str, retries: int = 5) -> str:
     """Chama a API Gemini com retry inteligente para rate limit.
     Detecta erro 429 e respeita o tempo de retry sugerido pela API.
     """
     import re
 
+    model = genai.GenerativeModel(MODEL)
+
     for attempt in range(retries):
         try:
-            model = genai.GenerativeModel(MODEL)
             response = model.generate_content(prompt)
             return response.text
         except Exception as e:
@@ -86,7 +88,7 @@ def call_llm(prompt: str, retries: int = 5) -> str:
                 else:
                     wait_time = 60 * (attempt + 1)  # Fallback: 60s, 120s, 180s...
 
-                print(f"  ⚠ Rate limit atingido (tentativa {attempt+1}/{retries})")
+                print(f"  Rate limit atingido (tentativa {attempt+1}/{retries})")
                 print(f"    Aguardando {wait_time:.1f}s conforme API solicitou...")
                 time.sleep(wait_time)
             elif attempt < retries - 1:
@@ -139,16 +141,46 @@ def get_missing_fields(data_list: list, names: list, required_fields: list) -> l
 
 
 # ──────────────────────────────────────────────────────────────────────────────
+# Checkpoint Management
+# ──────────────────────────────────────────────────────────────────────────────
+
+def load_checkpoint() -> dict:
+    """Carrega estado anterior se existir."""
+    if os.path.exists(CHECKPOINT_FILE):
+        try:
+            with open(CHECKPOINT_FILE, 'r') as f:
+                checkpoint = json.load(f)
+                # Converter list de volta para set
+                checkpoint["processed_batches"] = set(checkpoint.get("processed_batches", []))
+                return checkpoint
+        except (json.JSONDecodeError, IOError) as e:
+            print(f"⚠️  Erro ao carregar checkpoint: {e}")
+    return {"processed_batches": set(), "filled": 0, "skipped": 0}
+
+def save_checkpoint(checkpoint: dict):
+    """Salva estado de progresso."""
+    checkpoint_copy = checkpoint.copy()
+    checkpoint_copy["processed_batches"] = list(checkpoint["processed_batches"])
+    with open(CHECKPOINT_FILE, 'w') as f:
+        json.dump(checkpoint_copy, f, indent=2)
+
+
+# ──────────────────────────────────────────────────────────────────────────────
 # CPU Enrichment
 # ──────────────────────────────────────────────────────────────────────────────
 
 def build_cpu_prompt(missing_fields_data: list) -> str:
     """Constrói prompt dinâmico com apenas os campos faltantes."""
     fields_desc = {
-        "cache_l1":"quantidade de memória cache l1 em MB",
-        "cache_l2":"quantidade de memória cache l2 em MB",
-        "cache_l3":"quantidade de memória cache l3 em MB"
-
+        "tdp": "consumo de potência em watts (ex: 65, 105, 140) ou 0 se desconhecido",
+        "price": "preço em USD (ex: 199, 389, 499) ou 0 se desconhecido",
+        "speed": "velocidade base em MHz (ex: 3200, 3600, 4000) ou 0 se desconhecido",
+        "turbo": "frequência turbo em MHz (ex: 4000, 4500, 5000) ou 0 se desconhecido",
+        "cpuCount": "número de núcleos físicos (ex: 4, 6, 8) ou 0 se desconhecido",
+        "cores": "número de threads (ex: 8, 12, 16) ou 0 se desconhecido",
+        "l1_cache": "cache L1 em KB (ex: 32, 64, 128) ou 0 se desconhecido",
+        "l2_cache": "cache L2 em KB (ex: 256, 512, 1024) ou 0 se desconhecido",
+        "l3_cache": "cache L3 em MB (ex: 8, 16, 32) ou 0 se desconhecido",
     }
 
     # Construir lista de campos dinâmicos
@@ -181,27 +213,34 @@ def enrich_cpus(batch_size: int = BATCH_SIZE, delay: float = DELAY_BETWEEN_CALLS
     print("\n" + "="*60)
     print("  ENRIQUECENDO DATASET DE CPUs")
     print("="*60)
-    print(f"\n⚠ Aviso: API gratuita tem limite de ~20 req/dia")
     print(f"  Batch size: {batch_size} | Delay: {delay}s entre requisições")
-    print(f"  Processamento será LENTO mas respeitará os limites da API\n")
 
     df = pd.read_csv(CPU_INPUT)
 
-    df['cache_l1'] = np.zeros(len(df))
-    df['cache_l2'] = np.zeros(len(df))
-    df['cache_l3'] = np.zeros(len(df))
+    df['l1_cache'] = np.zeros(len(df))
+    df['l2_cache'] = np.zeros(len(df))
+    df['l3_cache'] = np.zeros(len(df))
 
     print(f"Dataset carregado: {len(df)} linhas")
 
-    # Remove linhas de "No CPUs found"
+    # Garante que todas as colunas alvo existem 
+    for col in CPU_TARGET_COLS:
+        if col not in df.columns:
+            df[col] = 0
+    
     before = len(df)
     df = df[~df['name'].str.contains("No CPUs found", na=False)].copy()
     print(f"Removidas {before - len(df)} linhas de 'No CPUs found'")
 
+    # Filtrar por data >= 2009
+    before = len(df)
+    df['date'] = pd.to_datetime(df['date'], errors='coerce')
+    df = df[df['date'] >= '2009-01-01'].copy()
+    print(f"Removidas {before - len(df)} linhas com data anterior a 2009")
+
     # Identifica linhas que precisam de enriquecimento
-    # Uma linha precisa de enriquecimento se alguma coluna-alvo tiver valor 0
     needs_enrichment = df[
-        (df['cache_l1'] == 0) | (df['cache_l2'] == 0) | (df['cache_l3'] == 0)
+        (df['tdp'] == 0) | (df['price'] == 0) | (df['turbo'] == 0) | (df['speed'] == 0) | (df['cpuCount'] == 0) | (df['cores'] == 0) | (df['l1_cache'] == 0) | (df['l2_cache'] == 0) | (df['l3_cache'] == 0)
     ].index.tolist()
 
     all_indices = needs_enrichment
@@ -218,69 +257,129 @@ def enrich_cpus(batch_size: int = BATCH_SIZE, delay: float = DELAY_BETWEEN_CALLS
     total_time_minutes = (num_batches * delay) / 60
 
     print(f"Batches: {num_batches} | Tempo estimado: ~{total_time_minutes:.1f} minutos")
-    print(f"(API gratuita permite apenas ~20 requisições por dia)\n")
-
-    filled = 0
-    skipped = 0
+    
+    # Carregar checkpoint de execução anterior
+    checkpoint = load_checkpoint()
+    processed_batches = checkpoint.get("processed_batches", set())
+    filled = checkpoint.get("filled", 0)
+    skipped = checkpoint.get("skipped", 0)
+    
+    if processed_batches:
+        print(f"\n⏮️  Retomando de checkpoint:")
+        print(f"   Batches já processados: {len(processed_batches)}")
+        print(f"   Progresso anterior: {filled} preenchidas, {skipped} skipped")
+        print(f"   Próximo batch: {max(processed_batches) + 2 if processed_batches else 1}\n")
 
     for batch_num, batch_idx in enumerate(tqdm(batches, desc="Processando batches")):
-        # Preparar dados com campos faltantes (otimizado para tokens)
+        # Pular batches já processados
+        if batch_num in processed_batches:
+            continue
+        
+        # Preparar dados com campos faltantes
         batch_data = [df.loc[idx].to_dict() for idx in batch_idx]
         batch_names = [d['name'] for d in batch_data]
         missing_fields_data = get_missing_fields(batch_data, batch_names, CPU_TARGET_COLS)
-
+        
+        batch_filled = 0
+        batch_skipped = 0
+        batch_details = []
+        batch_status = ""
+        
         if not missing_fields_data:
             # Todos os itens do batch já têm dados completos
-            continue
+            batch_status = "SKIP - Dados já completos"
+        else:
+            prompt = build_cpu_prompt(missing_fields_data)
+            raw = call_llm(prompt)
+            
+            if not raw:
+                # API falhou - pular este batch completamente
+                batch_skipped = len(batch_idx)
+                skipped += batch_skipped
+                batch_status = f"ERRO - Sem resposta da API (pulando {len(batch_idx)} elementos)"
+            else:
+                results = safe_parse_json(raw)
+                if not isinstance(results, list):
+                    batch_skipped = len(batch_idx)
+                    skipped += batch_skipped
+                    batch_status = f"ERRO - Resposta inválida do LLM (pulando {len(batch_idx)} elementos)"
+                else:
+                    # Indexa resultados pelo nome
+                    results_map = {r.get("name", ""): r for r in results if isinstance(r, dict)}
 
-        prompt = build_cpu_prompt(missing_fields_data)
+                    for idx in batch_idx:
+                        cpu_name = df.at[idx, 'name']
+                        result = results_map.get(cpu_name)
+                        if not result:
+                            batch_skipped += 1
+                            skipped += 1
+                            continue
 
-        raw = call_llm(prompt)
-        if not raw:
-            skipped += len(missing_fields_data)
-            continue
+                        batch_filled += 1
+                        filled += 1
+                        
+                        filled_fields = {}
+                        for col in ['tdp', 'price', 'turbo', 'speed', 'cpuCount', 'cores', 'l1_cache', 'l2_cache', 'l3_cache']:
+                            current_val = df.at[idx, col]
+                            result_val = result.get(col)
+                            
+                            try:
+                                result_val = int(result_val) if result_val is not None else None
+                            except (ValueError, TypeError):
+                                result_val = None
+                            
+                            # Verifica se o campo está vazio (0, NaN, None)
+                            is_empty = current_val == 0 or pd.isna(current_val)
+                            
+                            # Preenche se o campo atual está vazio e o LLM forneceu um valor válido
+                            if is_empty and result_val is not None and result_val != 0:
+                                df.at[idx, col] = result_val
+                                filled_fields[col] = result_val
+                        
+                        batch_details.append({
+                            'cpu': cpu_name,
+                            'filled': filled_fields,
+                            'result': result 
+                        })
+                    
+                    batch_status = "OK"
 
-        results = safe_parse_json(raw)
-        print(results)
-        if not isinstance(results, list):
-            print(f"  ⚠ Batch {batch_num+1}: resposta inválida do LLM")
-            skipped += len(batch_idx)
-            continue
-
-        # Indexa resultados pelo nome
-        results_map = {r.get("name", ""): r for r in results if isinstance(r, dict)}
-
-        for idx in batch_idx:
-            cpu_name = df.at[idx, 'name']
-            result = results_map.get(cpu_name)
-            if not result:
-                skipped += 1
-                continue
-
-            filled += 1
-            # Preenche campos com valor 0 (faltantes) com os dados do LLM
-            for col in ['cache_l1', 'cache_l2', 'cache_l3']:
-                current_val = df.at[idx, col]
-                result_val = result.get(col)
-                # Preenche se o campo atual é 0 e o LLM forneceu um valor não-zero
-                if current_val == 0 and result_val is not None and result_val != 0:
-                    df.at[idx, col] = result_val
-
+        # Print de debug ao fim do batch
+        print(f"\n Batch {batch_num+1}/{num_batches} [{batch_status}]:")
+        print(f"   ✓ Preenchidas: {batch_filled} | ✗ Skipped: {batch_skipped}")
+        if batch_details and len(batch_details) <= 5:
+            print(f"   Detalhes:")
+            for item in batch_details[:5]:
+                if item['filled']:
+                    fields_str = ", ".join([f"{k}={v}" for k, v in item['filled'].items()])
+                    print(f"       {item['cpu']}: {fields_str}")
+        
+        # ✅ SALVAR APÓS CADA BATCH
+        processed_batches.add(batch_num)
+        df.to_csv(CPU_OUTPUT, index=False)
+        save_checkpoint({"processed_batches": processed_batches, "filled": filled, "skipped": skipped})
+        print(f"   💾 Progresso salvo: {filled} preenchidas, {skipped} skipped")
+        
         time.sleep(delay)
 
     # Salva resultado
     df.to_csv(CPU_OUTPUT, index=False)
 
     print(f"\n✓ Concluído!")
-    print(f"  Linhas preenchidas: {filled}")
-    print(f"  Linhas sem resposta: {skipped}")
+    print(f"  Total preenchidas: {filled}")
+    print(f"  Total skipped: {skipped}")
     print(f"  Arquivo salvo: {CPU_OUTPUT}")
 
-    # Relatório de zeros restantes (dados faltantes)
+    # Relatório de dados faltantes
     print("\nValores faltantes (zeros) restantes nas colunas principais:")
-    for col in ['cache_l1', 'cache_l2', 'cache_l3']:
+    for col in ['tdp', 'price', 'turbo', 'speed', 'cpuCount', 'cores', 'l1_cache', 'l2_cache', 'l3_cache']:
         n = (df[col] == 0).sum()
         print(f"  {col}: {n}")
+    
+    # Limpar checkpoint após conclusão
+    if os.path.exists(CHECKPOINT_FILE):
+        os.remove(CHECKPOINT_FILE)
+        print(f"\n✓ Checkpoint removido (execução concluída)")
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Main
@@ -308,8 +407,8 @@ def main():
     batch_size = args.batch_size
     delay_between_calls = args.delay
 
-    setup_client()
-    print(f"Cliente Google Generative AI inicializado. Modelo: {MODEL}")
+    setup_api_key()
+    print(f"Chave da API Google configurada. Modelo: {MODEL}")
     print(f"Batch size: {batch_size} | Delay: {delay_between_calls}s\n")
 
     enrich_cpus(batch_size, delay_between_calls)
