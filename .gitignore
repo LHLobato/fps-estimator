@@ -1,3 +1,4 @@
 .env*
 model/.env
 model/__pycache__
+fps_api/
