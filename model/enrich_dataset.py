@@ -25,8 +25,8 @@ from dotenv import load_dotenv
 # Carrega variáveis do arquivo .env
 load_dotenv()
 
-CPU_INPUT  = "../data/data_cleaned.csv"
-CPU_OUTPUT = "../data/tpu_cpus_enriched.csv"
+CPU_INPUT  = "../data/tpu_cpus_enriched.csv"
+CPU_OUTPUT = "../data/tpu_cpus_enriched-final.csv"
 
 MODEL = "gemini-2.5-flash"
 
@@ -42,9 +42,9 @@ BATCH_SIZE = 150
 # ─── CPU: colunas que queremos preencher ─────────────────────────────────────
 # Colunas com valores 0 são consideradas faltantes
 CPU_TARGET_COLS = [
-    "tdp",      # TDP em watts
-    "price",    # Preço
-    "turbo",    # Velocidade turbo em MHz
+    "cache_l1",      # TDP em watts
+    "cache_l2",    # Preço
+    "cache_l3",    # Velocidade turbo em MHz
 ]
 
 
@@ -68,7 +68,7 @@ def call_llm(prompt: str, retries: int = 5) -> str:
     Detecta erro 429 e respeita o tempo de retry sugerido pela API.
     """
     import re
-    
+
     for attempt in range(retries):
         try:
             model = genai.GenerativeModel(MODEL)
@@ -76,7 +76,7 @@ def call_llm(prompt: str, retries: int = 5) -> str:
             return response.text
         except Exception as e:
             error_str = str(e)
-            
+
             # Detectar erro 429 (rate limit) e extrair tempo de espera
             if "429" in error_str:
                 # Tentar extrair tempo de retry da mensagem de erro
@@ -85,7 +85,7 @@ def call_llm(prompt: str, retries: int = 5) -> str:
                     wait_time = float(retry_match.group(1)) + 5  # Adicionar buffer de 5s
                 else:
                     wait_time = 60 * (attempt + 1)  # Fallback: 60s, 120s, 180s...
-                
+
                 print(f"  ⚠ Rate limit atingido (tentativa {attempt+1}/{retries})")
                 print(f"    Aguardando {wait_time:.1f}s conforme API solicitou...")
                 time.sleep(wait_time)
@@ -120,7 +120,7 @@ def safe_parse_json(text: str) -> dict | list | None:
             except json.JSONDecodeError:
                 pass
         return None
-    
+
 def get_missing_fields(data_list: list, names: list, required_fields: list) -> list:
     """Retorna apenas nomes e campos faltantes para otimizar tokens.
     Considera 0 como valor faltante para campos numéricos."""
@@ -129,8 +129,8 @@ def get_missing_fields(data_list: list, names: list, required_fields: list) -> l
         data = data_list[i] if i < len(data_list) else {}
         # Campo está faltando se for None ou 0 (para campos numéricos)
         missing = [f for f in required_fields if f not in data or data[f] is None or data[f] == 0]
-        
-        if missing:  
+
+        if missing:
             prompt_data.append({
                 "name": name,
                 "missing_fields": missing
@@ -145,17 +145,18 @@ def get_missing_fields(data_list: list, names: list, required_fields: list) -> l
 def build_cpu_prompt(missing_fields_data: list) -> str:
     """Constrói prompt dinâmico com apenas os campos faltantes."""
     fields_desc = {
-        "tdp": "consumo de potência em watts (ex: 65, 105, 140) ou 0 se desconhecido",
-        "price": "preço em USD (ex: 199, 389, 499) ou 0 se desconhecido",
-        "turbo": "frequência turbo em MHz (ex: 4000, 4500, 5000) ou 0 se desconhecido",
+        "cache_l1":"quantidade de memória cache l1 em MB"
+        "cache_l2":"quantidade de memória cache l2 em MB"
+        "cache_l3":"quantidade de memória cache l3 em MB"
+
     }
-    
+
     # Construir lista de campos dinâmicos
     fields_list = "\n".join([
         f"  - {item['name']}: {', '.join([fields_desc.get(f, f) for f in item['missing_fields']])}"
         for item in missing_fields_data
     ])
-    
+
     return f"""Você é um especialista em processadores de computadores.
 
 Para cada CPU abaixo, forneça APENAS os campos faltantes listados. Se não souber um valor, use 0.
@@ -186,6 +187,11 @@ def enrich_cpus(batch_size: int = BATCH_SIZE, delay: float = DELAY_BETWEEN_CALLS
     print(f"  Processamento será LENTO mas respeitará os limites da API\n")
 
     df = pd.read_csv(CPU_INPUT)
+
+    df['cache_l1'] = np.zeros(len(df))
+    df['cache_l2'] = np.zeros(len(df))
+    df['cache_l3'] = np.zeros(len(df))
+
     print(f"Dataset carregado: {len(df)} linhas")
 
     # Remove linhas de "No CPUs found"
@@ -211,10 +217,10 @@ def enrich_cpus(batch_size: int = BATCH_SIZE, delay: float = DELAY_BETWEEN_CALLS
     batches = [all_indices[i:i+batch_size] for i in range(0, len(all_indices), batch_size)]
     num_batches = len(batches)
     total_time_minutes = (num_batches * delay) / 60
-    
+
     print(f"Batches: {num_batches} | Tempo estimado: ~{total_time_minutes:.1f} minutos")
     print(f"(API gratuita permite apenas ~20 requisições por dia)\n")
-    
+
     filled = 0
     skipped = 0
 
@@ -223,11 +229,11 @@ def enrich_cpus(batch_size: int = BATCH_SIZE, delay: float = DELAY_BETWEEN_CALLS
         batch_data = [df.loc[idx].to_dict() for idx in batch_idx]
         batch_names = [d['name'] for d in batch_data]
         missing_fields_data = get_missing_fields(batch_data, batch_names, CPU_TARGET_COLS)
-        
+
         if not missing_fields_data:
             # Todos os itens do batch já têm dados completos
             continue
-        
+
         prompt = build_cpu_prompt(missing_fields_data)
 
         raw = call_llm(prompt)
