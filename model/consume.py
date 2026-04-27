@@ -4,12 +4,19 @@ import os
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
-from schemas import BenchmarkResult
-from text_func import retrieval_gpu_feat, retrieval_cpu_feat
+from pathlib import Path
+import sys
+from model.schemas import BenchmarkResult
+from model.text_func import retrieval_gpu_feat, retrieval_cpu_feat
+
 load_dotenv()
+DATA_DIR = Path(__file__).parent.parent / "data"
+GPU_DF = pd.read_csv(f"{DATA_DIR}/gpu_1986-2026_normalized_dates.csv", index_col=False)
+CPU_DF = pd.read_csv(f"{DATA_DIR}/data_cleaned.csv", index_col=False)
+GAME_DF = pd.read_csv(f"{DATA_DIR}/gamenames.csv", index_col=False)
 
 
-def send_question(components:list, game:str, preset:str, resolution:str) -> str:
+def send_question(components:list, game:str, preset:str, resolution:str, upscaling:str) -> str:
     """
     Function that connects application with the GOOGLE API, receiving the related to build
     the LLM prompt.
@@ -29,9 +36,10 @@ def send_question(components:list, game:str, preset:str, resolution:str) -> str:
     config = types.GenerateContentConfig(
             system_instruction=(
                 "You are a PC benchmark specialist. You will receive a hardware configuration "
-                "(GPU, CPU, RAM), the name of a game, and the graphical quality (preset). "
+                "(GPU, CPU, RAM), the name of a game, and the graphical quality (preset), resolution and upscaling method if so. "
+                "After the Hardware components, the most important features are resolution and upscaling method, always give more weight for them in your thinking."
                 "Your task is to estimate the FPS with the highest technical accuracy possible, "
-                "based on known real-world tests. "
+                "based on known real-world tests. If you don't know the game or hardware specified feel free to search in web."
                 "STRICT RULE: Return ONLY the raw, validated JSON object. Do not include greetings, "
                 "do not write 'Here is the JSON requested' or any other conversational text, "
                 "and NEVER use markdown code blocks (```json)."
@@ -46,13 +54,17 @@ def send_question(components:list, game:str, preset:str, resolution:str) -> str:
     cpu_name = components[1]
     ram = components[2]
 
-    gpu_prompted = f"{gpu_name} | {retrieval_gpu_feat(gpu_name, pd.read_csv("../data/gpu_1986-2026_normalized_dates.csv", index_col=False))}"
+    gpu_prompted = f"{gpu_name} | {retrieval_gpu_feat(gpu_name, GPU_DF)}"
 
-    cpu_prompted = f"{cpu_name} | {retrieval_cpu_feat(cpu_name, pd.read_csv("../data/data_cleaned.csv", index_col=False))}"
+    cpu_prompted = f"{cpu_name} | {retrieval_cpu_feat(cpu_name, CPU_DF)}"
 
+    if not upscaling:
+        upscaling = "No"
+    print(upscaling)
     prompt = (
         f"[Hardware] {gpu_prompted} | {cpu_prompted} | {ram}\n"
         f"[Game] {game} \n"
+        f"[Upscaling] {upscaling}\n"
         f"[Resolution] {resolution}\n"
         f"[Preset] {preset}"
     )
@@ -64,10 +76,5 @@ def send_question(components:list, game:str, preset:str, resolution:str) -> str:
     )
 
     return response.text
-
-components = ["RTX 5060", "Ryzen 7 5700X", "16GB RAM DDR4"]
-game = "Resident Evil 4 Remake"
-preset = "High"
-resolution = "4K"
-print(send_question(components, game, preset, resolution))
+#print(send_question(components, game, preset, resolution))
 #print(retrieval_cpu_feat("i3-10100F", pd.read_csv("../data/data_cleaned.csv")))
