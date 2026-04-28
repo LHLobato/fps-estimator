@@ -30,6 +30,11 @@ DATABASE_URL = f"postgresql://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 db = create_engine(DATABASE_URL)
 Base = declarative_base()
 
+"""
+Still have to create GPU and CPU tables, then modifie user's CPU and GPU for maintaining ID instead of names (foreign key).
+"""
+
+
 class Users(Base):
     __tablename__ = "Users"
     id = Column("id", Integer, primary_key=True, autoincrement=True)
