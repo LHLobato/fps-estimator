@@ -4,8 +4,7 @@ from fastapi import APIRouter, HTTPException
 from model.consume import send_question
 from fps_api.schemas import InputSchema, ModelOutputSchema
 import json
-from slowapi import Limiter
-from slowapi.util import get_remote_address
+from fps_api.limiter import limiter
 from fastapi import Request
 import asyncio
 
@@ -14,8 +13,6 @@ llm_router = APIRouter(
     prefix="/estimate", tags=["estimate, llm, regression"]
 )
 
-
-limiter = Limiter(key_func=get_remote_address)
 @llm_router.post("/ask_llm", response_model=ModelOutputSchema)
 @limiter.limit("5/minute")
 async def estimate(request:Request, input:InputSchema)-> ModelOutputSchema:

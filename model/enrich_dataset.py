@@ -223,11 +223,11 @@ def enrich_cpus(batch_size: int = BATCH_SIZE, delay: float = DELAY_BETWEEN_CALLS
 
     print(f"Dataset carregado: {len(df)} linhas")
 
-    # Garante que todas as colunas alvo existem 
+    # Garante que todas as colunas alvo existem
     for col in CPU_TARGET_COLS:
         if col not in df.columns:
             df[col] = 0
-    
+
     before = len(df)
     df = df[~df['name'].str.contains("No CPUs found", na=False)].copy()
     print(f"Removidas {before - len(df)} linhas de 'No CPUs found'")
@@ -257,13 +257,13 @@ def enrich_cpus(batch_size: int = BATCH_SIZE, delay: float = DELAY_BETWEEN_CALLS
     total_time_minutes = (num_batches * delay) / 60
 
     print(f"Batches: {num_batches} | Tempo estimado: ~{total_time_minutes:.1f} minutos")
-    
+
     # Carregar checkpoint de execução anterior
     checkpoint = load_checkpoint()
     processed_batches = checkpoint.get("processed_batches", set())
     filled = checkpoint.get("filled", 0)
     skipped = checkpoint.get("skipped", 0)
-    
+
     if processed_batches:
         print(f"\n⏮️  Retomando de checkpoint:")
         print(f"   Batches já processados: {len(processed_batches)}")
@@ -274,24 +274,24 @@ def enrich_cpus(batch_size: int = BATCH_SIZE, delay: float = DELAY_BETWEEN_CALLS
         # Pular batches já processados
         if batch_num in processed_batches:
             continue
-        
+
         # Preparar dados com campos faltantes
         batch_data = [df.loc[idx].to_dict() for idx in batch_idx]
         batch_names = [d['name'] for d in batch_data]
         missing_fields_data = get_missing_fields(batch_data, batch_names, CPU_TARGET_COLS)
-        
+
         batch_filled = 0
         batch_skipped = 0
         batch_details = []
         batch_status = ""
-        
+
         if not missing_fields_data:
             # Todos os itens do batch já têm dados completos
             batch_status = "SKIP - Dados já completos"
         else:
             prompt = build_cpu_prompt(missing_fields_data)
             raw = call_llm(prompt)
-            
+
             if not raw:
                 # API falhou - pular este batch completamente
                 batch_skipped = len(batch_idx)
@@ -317,31 +317,31 @@ def enrich_cpus(batch_size: int = BATCH_SIZE, delay: float = DELAY_BETWEEN_CALLS
 
                         batch_filled += 1
                         filled += 1
-                        
+
                         filled_fields = {}
                         for col in ['tdp', 'price', 'turbo', 'speed', 'cpuCount', 'cores', 'l1_cache', 'l2_cache', 'l3_cache']:
                             current_val = df.at[idx, col]
                             result_val = result.get(col)
-                            
+
                             try:
                                 result_val = int(result_val) if result_val is not None else None
                             except (ValueError, TypeError):
                                 result_val = None
-                            
+
                             # Verifica se o campo está vazio (0, NaN, None)
                             is_empty = current_val == 0 or pd.isna(current_val)
-                            
+
                             # Preenche se o campo atual está vazio e o LLM forneceu um valor válido
                             if is_empty and result_val is not None and result_val != 0:
                                 df.at[idx, col] = result_val
                                 filled_fields[col] = result_val
-                        
+
                         batch_details.append({
                             'cpu': cpu_name,
                             'filled': filled_fields,
-                            'result': result 
+                            'result': result
                         })
-                    
+
                     batch_status = "OK"
 
         # Print de debug ao fim do batch
@@ -353,13 +353,13 @@ def enrich_cpus(batch_size: int = BATCH_SIZE, delay: float = DELAY_BETWEEN_CALLS
                 if item['filled']:
                     fields_str = ", ".join([f"{k}={v}" for k, v in item['filled'].items()])
                     print(f"       {item['cpu']}: {fields_str}")
-        
+
         # ✅ SALVAR APÓS CADA BATCH
         processed_batches.add(batch_num)
         df.to_csv(CPU_OUTPUT, index=False)
         save_checkpoint({"processed_batches": processed_batches, "filled": filled, "skipped": skipped})
         print(f"   💾 Progresso salvo: {filled} preenchidas, {skipped} skipped")
-        
+
         time.sleep(delay)
 
     # Salva resultado
@@ -375,7 +375,7 @@ def enrich_cpus(batch_size: int = BATCH_SIZE, delay: float = DELAY_BETWEEN_CALLS
     for col in ['tdp', 'price', 'turbo', 'speed', 'cpuCount', 'cores', 'l1_cache', 'l2_cache', 'l3_cache']:
         n = (df[col] == 0).sum()
         print(f"  {col}: {n}")
-    
+
     # Limpar checkpoint após conclusão
     if os.path.exists(CHECKPOINT_FILE):
         os.remove(CHECKPOINT_FILE)
