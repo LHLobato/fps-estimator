@@ -29,8 +29,18 @@ class UserBase(BaseModel):
         from_attributes = True
 
 
+class UserAlter(UserBase):
+    profile_photo: Optional[str] 
+
+
+class UserAlterSetup(UserBase):
+    gpu: Optional[str] = None
+    cpu: Optional[str] = None
+    ram: Optional[str] = None
+
 class UserCreate(UserBase):
     password: str
+    profile_photo: Optional[str] 
     gpu: Optional[str] = None
     cpu: Optional[str] = None
     ram: Optional[str] = None
@@ -38,6 +48,7 @@ class UserCreate(UserBase):
 
 class UserResponse(UserBase):
     id: int
+    profile_photo: Optional[str] = None
     gpu: Optional[str] = None
     cpu: Optional[str] = None
     ram: Optional[str] = None

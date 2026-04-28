@@ -30,12 +30,12 @@ DATABASE_URL = f"postgresql://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 db = create_engine(DATABASE_URL)
 Base = declarative_base()
 
-
 class Users(Base):
     __tablename__ = "Users"
     id = Column("id", Integer, primary_key=True, autoincrement=True)
     name = Column("name", String)
     email = Column("email", String, nullable=False, unique=True, index=True)
+    profile_photo = Column("profile_photo", String, nullable=True)
     gpu = Column("gpu", String)
     cpu = Column("cpu", String)
     ram = Column("ram", String)
