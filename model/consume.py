@@ -16,7 +16,7 @@ CPU_DF = pd.read_csv(f"{DATA_DIR}/data_cleaned.csv", index_col=False)
 GAME_DF = pd.read_csv(f"{DATA_DIR}/gamenames.csv", index_col=False)
 
 
-def send_question(components:list, game:str, preset:str, resolution:str, upscaling:str) -> str:
+def send_question(components:dict, game:str, preset:str, resolution:str, upscaling:str) -> str:
     """
     Function that connects application with the GOOGLE API, receiving the related to build
     the LLM prompt.
@@ -50,9 +50,9 @@ def send_question(components:list, game:str, preset:str, resolution:str, upscali
         response_schema=BenchmarkResult,
         )
 
-    gpu_name = components[0]
-    cpu_name = components[1]
-    ram = components[2]
+    gpu_name = components['gpu']
+    cpu_name = components['cpu']
+    ram = components['ram']
 
     gpu_prompted = f"{gpu_name} | {retrieval_gpu_feat(gpu_name, GPU_DF)}"
 

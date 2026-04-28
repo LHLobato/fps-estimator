@@ -10,6 +10,12 @@ class InputSchema(BaseModel):
     cpu: str
     ram: str
 
+class AuthInputSchema(BaseModel):
+    gamename: str
+    preset: str
+    resolution: str
+    upscaling: str
+
 class ModelOutputSchema(BaseModel):
     avg_fps: int
     min_fps: int
