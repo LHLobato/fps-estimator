@@ -1,51 +1,356 @@
-/* src/index.css */
+/* src/index.css - FPS_CORE Design System */
+
+/* Tailwind CSS v4 */
+@import "tailwindcss";
+
+/* Material Symbols Outlined */
+@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap');
 
 /* Importando as fontes escolhidas do Google Fonts */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400&family=Space+Grotesk:wght@500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Space+Grotesk:wght@300;400;500;600;700&display=swap');
 
-:root {
-  /* Cores Base */
-  --bg-deep-charcoal: #121212;
-  --bg-navy-glass: rgba(26, 30, 46, 0.4); /* Navy com 40% de opacidade */
-  
-  /* Cores Principais (Baseadas no seu manual) */
-  --primary-cyan: #00dbe9;
-  --primary-cyan-glow: rgba(0, 219, 233, 0.2);
-  --secondary-violet: #b600f8;
-  
-  /* Textos */
-  --text-primary: #e5e2e1;
-  --text-muted: #b9cacb;
+/* ============================================
+   GLOBAL RESET & BASE STYLES
+   ============================================ */
 
-  /* Fontes */
-  --font-heading: 'Space Grotesk', sans-serif;
-  --font-body: 'Inter', sans-serif;
-}
+/* ⚠️ REMOVIDO: * { margin: 0; padding: 0; } — sobrescrevia os utilitários do Tailwind.
+   O Tailwind v4 já inclui seu próprio Preflight (reset), não precisa de reset manual. */
 
-/* Reset Básico e Aplicação do Fundo */
-* {
-  margin: 0;
-  padding: 0;
+*, *::before, *::after {
   box-sizing: border-box;
 }
 
+html, body, #root {
+  width: 100%;
+  height: 100%;
+}
+
+:root {
+  --sidebar-width: 220px;
+  --app-bar-height: 56px;
+  --text-primary: #e5e2e1;
+  --text-muted: #b9cacb;
+  --primary-cyan: #00dbe9;
+  --secondary-violet: #ebb2ff;
+  --panel-navy: rgba(15, 23, 42, 0.4);
+}
+
 body {
-  background-color: var(--bg-deep-charcoal);
+  background-color: #0b1020;
   color: var(--text-primary);
-  font-family: var(--font-body);
+  font-family: "Inter", sans-serif;
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1.6;
   -webkit-font-smoothing: antialiased;
-  min-height: 100vh;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
 }
 
-/* Tipografia Global (Baseada no seu manual) */
-h1, h2, h3, .data-display {
-  font-family: var(--font-heading);
+/* ============================================
+   TYPOGRAPHY
+   ============================================ */
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: "Space Grotesk", sans-serif;
+  font-weight: 700;
 }
 
+h1 {
+  font-size: 48px;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+h2 {
+  font-size: 32px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+h3 {
+  font-size: 24px;
+  font-weight: 500;
+  line-height: 1.3;
+}
+
+/* Label Caps - All Uppercase */
 .label-caps {
-  font-family: var(--font-heading);
+  font-family: "Space Grotesk", sans-serif;
   font-size: 12px;
   font-weight: 700;
-  text-transform: uppercase;
+  line-height: 1;
   letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+/* Data Display - Large Numbers */
+.data-display {
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 56px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* ============================================
+   GLASS-MORPHISM COMPONENTS
+   ============================================ */
+
+.glass-panel {
+  position: relative;
+  background: var(--panel-navy);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid transparent;
+  box-shadow: inset 0 0 20px rgba(0, 240, 255, 0.05);
+  border-radius: 4px;
+}
+
+.glass-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  padding: 1px;
+  border-radius: inherit;
+  background: linear-gradient(
+    135deg,
+    rgba(0, 219, 233, 0.9) 0%,
+    rgba(0, 219, 233, 0.9) 30%,
+    rgba(235, 178, 255, 0.6) 90%,
+    rgba(235, 178, 255, 0.6) 100%
+  );
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+.glass-panel:hover {
+  box-shadow: inset 0 0 20px rgba(0, 240, 255, 0.08);
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 20px;
+  align-items: stretch;
+}
+
+.grid-span-4 {
+  grid-column: span 4;
+}
+
+.grid-span-6 {
+  grid-column: span 6;
+}
+
+.grid-span-8 {
+  grid-column: span 8;
+}
+
+.grid-span-12 {
+  grid-column: span 12;
+}
+
+.glass-card {
+  position: relative;
+  background: var(--panel-navy);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid transparent;
+  box-shadow: inset 0 0 20px rgba(0, 240, 255, 0.05);
+  border-radius: 4px;
+  padding: 24px;
+  min-height: 300px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.glass-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  padding: 1px;
+  border-radius: inherit;
+  background: linear-gradient(
+    135deg,
+    rgba(0, 219, 233, 0.9) 0%,
+    rgba(0, 219, 233, 0.9) 30%,
+    rgba(235, 178, 255, 0.6) 90%,
+    rgba(235, 178, 255, 0.6) 100%
+  );
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  margin-bottom: 16px;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--primary-cyan);
+  box-shadow: 0 0 8px rgba(0, 219, 233, 0.6);
+}
+
+.stat-panel .stat-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Active/Focused Glow */
+.neon-glow {
+  box-shadow: 0 0 15px rgba(0, 240, 255, 0.2);
+}
+
+/* ============================================
+   MATERIAL SYMBOLS ICON
+   ============================================ */
+
+.material-symbols-outlined {
+  font-family: 'Material Symbols Outlined', sans-serif;
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  vertical-align: middle;
+  font-size: 24px;
+  line-height: 1;
+}
+
+/* ============================================
+   FORM ELEMENTS
+   ============================================ */
+
+input,
+select,
+textarea {
+  font-family: "Inter", sans-serif;
+  background-color: transparent;
+  border: none;
+  color: #e5e2e1;
+  outline: none;
+}
+
+input::placeholder {
+  color: rgba(229, 226, 225, 0.5);
+}
+
+/* Underline Input Style */
+input[type="text"],
+input[type="search"],
+input[type="email"],
+input[type="password"],
+select,
+textarea {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 0.75rem 0;
+  transition: border-color 0.2s ease;
+}
+
+input[type="text"]:focus,
+input[type="search"]:focus,
+input[type="email"]:focus,
+input[type="password"]:focus,
+select:focus,
+textarea:focus {
+  border-bottom-color: #00dbe9;
+  box-shadow: 0 2px 0 #00dbe9;
+}
+
+/* Select Appearance */
+select {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%2300dbe9' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.5rem center;
+  padding-right: 2rem;
+}
+
+/* ============================================
+   BUTTONS
+   ============================================ */
+
+button {
+  font-family: "Space Grotesk", sans-serif;
+  cursor: pointer;
+  border: none;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+/* Primary Button - Cyan to Violet Gradient */
+.btn-primary {
+  background: linear-gradient(90deg, #00dbe9, #ebb2ff);
+  color: #000;
+  font-weight: 700;
+  padding: 0.75rem 1.5rem;
+  letter-spacing: 0.05em;
+}
+
+.btn-primary:hover {
+  opacity: 0.9;
+  box-shadow: 0 0 30px rgba(0, 219, 233, 0.3);
+}
+
+.btn-primary:active {
+  transform: scale(0.98);
+}
+
+/* Secondary Button - Ghost Style */
+.btn-secondary {
+  background: rgba(15, 23, 42, 0.4);
+  border: 1px solid rgba(0, 219, 233, 0.4);
+  color: #00dbe9;
+  font-weight: 700;
+  padding: 0.75rem 1.5rem;
+  letter-spacing: 0.05em;
+}
+
+.btn-secondary:hover {
+  background: rgba(0, 219, 233, 0.1);
+  border-color: #00dbe9;
+}
+
+/* ============================================
+   UTILITY CLASSES
+   ============================================ */
+
+.text-gradient {
+  background: linear-gradient(90deg, #00dbe9, #ebb2ff);
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+}
+
+/* Subtle divider */
+.divider {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Status indicator */
+.status-pulse {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  background-color: #00dbe9;
+  border-radius: 50%;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
 }

@@ -1,38 +1,17 @@
 // src/components/GlassPanel.jsx
 
-export default function GlassPanel({ children, title }) {
-  const panelStyle = {
-    backgroundColor: 'var(--bg-navy-glass)',
-    backdropFilter: 'blur(20px)',
-    WebkitBackdropFilter: 'blur(20px)', /* Suporte para Safari */
-    borderRadius: '8px',
-    borderTop: '1px solid rgba(0, 219, 233, 0.3)', /* Borda top Cyan */
-    borderLeft: '1px solid rgba(0, 219, 233, 0.3)',
-    borderBottom: '1px solid rgba(182, 0, 248, 0.1)', /* Borda bottom Violet */
-    borderRight: '1px solid rgba(182, 0, 248, 0.1)',
-    padding: '24px',
-    color: 'white'
-  };
-
-  const headerStyle = {
-    marginBottom: '16px',
-    paddingBottom: '8px',
-    borderBottom: '1px solid rgba(255,255,255,0.1)',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px'
-  };
-
+export function GlassPanel({ children, title, className = '' }) {
   return (
-    <div style={panelStyle}>
+    <div className={`glass-panel ${className}`}>
       {title && (
-        <div style={headerStyle}>
-          <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: 'var(--primary-cyan)', boxShadow: '0 0 10px var(--primary-cyan)' }}></div>
-          <span className="label-caps">{title}</span>
+        <div className="flex items-center gap-2 mb-4 pb-2 border-b border-white/5">
+          <div className="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(0,240,255,0.5)]"></div>
+          <span className="font-label-caps text-[11px] text-white tracking-[0.25em]">{title}</span>
         </div>
       )}
-      {/* O "children" é o conteúdo que você vai colocar dentro do painel depois */}
-      <div>{children}</div>
+      {children}
     </div>
   );
 }
+
+export default GlassPanel;
