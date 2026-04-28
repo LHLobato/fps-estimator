@@ -1,0 +1,51 @@
+/* src/index.css */
+
+/* Importando as fontes escolhidas do Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400&family=Space+Grotesk:wght@500;600;700&display=swap');
+
+:root {
+  /* Cores Base */
+  --bg-deep-charcoal: #121212;
+  --bg-navy-glass: rgba(26, 30, 46, 0.4); /* Navy com 40% de opacidade */
+  
+  /* Cores Principais (Baseadas no seu manual) */
+  --primary-cyan: #00dbe9;
+  --primary-cyan-glow: rgba(0, 219, 233, 0.2);
+  --secondary-violet: #b600f8;
+  
+  /* Textos */
+  --text-primary: #e5e2e1;
+  --text-muted: #b9cacb;
+
+  /* Fontes */
+  --font-heading: 'Space Grotesk', sans-serif;
+  --font-body: 'Inter', sans-serif;
+}
+
+/* Reset Básico e Aplicação do Fundo */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background-color: var(--bg-deep-charcoal);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+}
+
+/* Tipografia Global (Baseada no seu manual) */
+h1, h2, h3, .data-display {
+  font-family: var(--font-heading);
+}
+
+.label-caps {
+  font-family: var(--font-heading);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
