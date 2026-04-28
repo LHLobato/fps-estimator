@@ -51,8 +51,6 @@ class Game(Base):
     name = Column("name", String, nullable=False, index=True)
 
     game_users = relationship("GameUser", back_populates="game", cascade="all, delete-orphan")
-
-
     def __init__(self, name):
         self.name = name
 

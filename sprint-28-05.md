@@ -6,4 +6,6 @@ For the current Sprint the following items must be implemented:
 - User's profile router - Photocopy -  Done
 - LLM route with autentication (user's query) - Photocopy - Done
 - Test API + Front-End at least with no auth - Photocopy && Thaumet 
-- Build the DB from CSVs (maybe GPU and CPU table's for PGVector?) - Photocopy
+- Build the DB from CSVs (maybe GPU and CPU table's for PGVector?) - Photocopy - Done
+
+
