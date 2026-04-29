@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 
 class InputSchema(BaseModel):
     gamename: str
@@ -30,7 +30,7 @@ class UserBase(BaseModel):
 
 
 class UserAlter(UserBase):
-    profile_photo: Optional[str] 
+    profile_photo: Optional[str]
 
 
 class UserAlterSetup(UserBase):
@@ -40,7 +40,7 @@ class UserAlterSetup(UserBase):
 
 class UserCreate(UserBase):
     password: str
-    profile_photo: Optional[str] 
+    profile_photo: Optional[str]
     gpu: Optional[str] = None
     cpu: Optional[str] = None
     ram: Optional[str] = None
@@ -94,3 +94,19 @@ class PasswordReset(BaseModel):
 
         class Config:
             from_attributes = True
+
+class GameSchema(BaseModel):
+    game_name: str
+    avg_fps: int
+    min_fps: int
+    max_fps: int
+    preset: str
+    resolution: str
+    upscaling: str
+
+    class Config:
+            from_attributes = True
+
+class GameListSchema(BaseModel):
+    status: str
+    items: Optional[List[GameSchema]] = None
