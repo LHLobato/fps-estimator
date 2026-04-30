@@ -207,8 +207,8 @@ export default function Estimate() {
                 <label className="block font-label-caps text-[12px] text-cyan-500 mb-2">
                   TARGET_GAME_IDENTIFIER
                 </label>
-                <div className="relative">
-                  <span className="absolute left-0 top-1/2 -translate-y-1/2 material-symbols-outlined text-slate-500 text-lg">
+                <div className="relative flex items-center">
+                  <span className="absolute right-0 top-1/2 -translate-y-1/2 material-symbols-outlined text-slate-500 text-lg">
                     search
                   </span>
                   <input

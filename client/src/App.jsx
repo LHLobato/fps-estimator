@@ -1,7 +1,7 @@
 import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
 import Home from './pages/Home';
 import Estimate from './pages/Estimate';
-import Games from './pages/Games';
+import User from './pages/User';
 import Compare from './pages/Compare';
 import './App.css';
 
@@ -12,7 +12,7 @@ function AppLayout() {
     { path: '/', label: 'Estimator', icon: 'speed' },
     { path: '/analytics', label: 'Analytics', icon: 'monitoring' },
     { path: '/compare', label: 'Comparison', icon: 'compare_arrows' },
-    { path: '/games', label: 'Library', icon: 'sports_esports' },
+    { path: '/user', label: 'Profile', icon: 'fingerprint' },
   ];
 
   return (
@@ -93,7 +93,7 @@ function AppLayout() {
               <Route path="/" element={<Estimate />} />
               <Route path="/analytics" element={<Home />} />
               <Route path="/compare" element={<Compare />} />
-              <Route path="/games" element={<Games />} />
+              <Route path="/user" element={<User />} />
             </Routes>
           </div>
         </main>
