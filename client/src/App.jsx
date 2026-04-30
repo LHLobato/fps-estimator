@@ -1,8 +1,9 @@
-import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
+import { Routes, Route, Link, useLocation } from 'react-router-dom';
 import Home from './pages/Home';
 import Estimate from './pages/Estimate';
 import User from './pages/User';
 import Compare from './pages/Compare';
+import Login from './pages/Login';
 import './App.css';
 
 function AppLayout() {
@@ -10,7 +11,6 @@ function AppLayout() {
 
   const navItems = [
     { path: '/', label: 'Estimator', icon: 'speed' },
-    { path: '/analytics', label: 'Analytics', icon: 'monitoring' },
     { path: '/compare', label: 'Comparison', icon: 'compare_arrows' },
     { path: '/user', label: 'Profile', icon: 'fingerprint' },
   ];
@@ -24,7 +24,7 @@ function AppLayout() {
           <h1 className="text-2xl font-black tracking-tighter text-cyan-400 drop-shadow-[0_0_8px_rgba(0,240,255,0.5)] font-['Space_Grotesk'] tracking-wider uppercase">
             FPS_CORE
           </h1>
-          <p className="text-[10px] text-slate-500 font-label-caps mt-1 tracking-widest">V.2.04_STABLE</p>
+          <p className="text-[10px] text-slate-500 font-label-caps mt-1 tracking-widest">V.0.1_STABLE</p>
         </div>
 
         {/* Nav */}
@@ -119,11 +119,15 @@ function AppLayout() {
 }
 
 function App() {
-  return (
-    <BrowserRouter>
-      <AppLayout />
-    </BrowserRouter>
-  );
+  const location = useLocation();
+
+  // Se estiver na página de login, mostrar sem layout
+  if (location.pathname === '/login') {
+    return <Login />;
+  }
+
+  // Caso contrário, mostrar com layout
+  return <AppLayout />;
 }
 
 export default App;
