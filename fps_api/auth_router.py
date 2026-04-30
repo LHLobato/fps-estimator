@@ -5,7 +5,7 @@ Implementa criptografia de senhas, JWT e verificação por email (OTP).
 
 import time
 from datetime import datetime, timedelta, timezone
-
+from uuid import UUID
 import pyotp
 from fps_api.auth_config import (
     ACCESS_TOKEN_EXPIRE_MINUTES,
@@ -46,7 +46,7 @@ auth_router = APIRouter(
 # Funções auxiliares
 # ========================
 def generate_token(
-    user_id: int,
+    user_id: UUID,
     expires_delta: timedelta = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
 ) -> str:
     """
@@ -295,7 +295,7 @@ async def verify_login_code(
             detail="Código inválido ou expirado",
         )
 
-    # Gera tokens
+    # Gera tokenss
     access_token = generate_token(user.id)
     refresh_token = generate_token(user.id, timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS))
 
@@ -332,7 +332,7 @@ async def refresh_token(
             )
 
         # Verifica se usuário existe e está ativo
-        user = session.query(Users).filter(Users.id == int(user_id)).first()
+        user = session.query(Users).filter(Users.id == user_id).first()
         if not user or not user.ativo:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -362,7 +362,7 @@ async def refresh_token(
 @limiter.limit("5/minute")
 async def get_current_user(
     request: Request,
-    user_id: int = Depends(get_current_user_id),
+    user_id: UUID = Depends(get_current_user_id),
     session: Session = Depends(get_session),
 ):
     """

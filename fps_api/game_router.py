@@ -11,7 +11,7 @@ game_router = APIRouter(prefix="/games", tags=["games, analysis"])
 @game_router.get("/list")
 @limiter.limit("5/minute")
 async def list_games(request:Request):
-    return {"games": GAME_DF['Name'].dropna().unique().tolist()}
+    return {"games": GAME_DF['name'].dropna().unique().tolist()}
 
 @game_router.post("/include")
 @limiter.limit("5/minute")
@@ -53,6 +53,7 @@ async def user_list(request: Request, user_id: int = Depends(get_current_user_id
         items=[
             GameSchema(
                 game_name=game_name,
+                game_id = gu.game_id,
                 avg_fps=gu.avg_fps,
                 min_fps=gu.min_fps,
                 max_fps=gu.max_fps,

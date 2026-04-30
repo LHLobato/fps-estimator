@@ -15,6 +15,9 @@ from sqlalchemy import (
     Text,
     create_engine,
 )
+
+import uuid
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import declarative_base, relationship
 
 load_dotenv()
@@ -37,7 +40,7 @@ Still have to create GPU and CPU tables, then modifie user's CPU and GPU for mai
 
 class Users(Base):
     __tablename__ = "Users"
-    id = Column("id", Integer, primary_key=True, autoincrement=True)
+    id = Column("id", UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = Column("name", String)
     email = Column("email", String, nullable=False, unique=True, index=True)
     profile_photo = Column("profile_photo", String, nullable=True)
@@ -52,7 +55,7 @@ class Users(Base):
 
 class Game(Base):
     __tablename__ = "Games"
-    id = Column("id", Integer, primary_key=True, autoincrement=True)
+    id = Column("id", UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = Column("name", String, nullable=False, index=True)
 
     game_users = relationship("GameUser", back_populates="game", cascade="all, delete-orphan")
@@ -61,9 +64,9 @@ class Game(Base):
 
 class GameUser(Base):
     __tablename__ = "GameUser"
-    id = Column("id", Integer, primary_key=True, autoincrement=True)
-    user_id = Column("user_id", Integer, ForeignKey("Users.id"), nullable=False)
-    game_id = Column("game_id", Integer, ForeignKey("Games.id"), nullable=False)
+    id = Column("id", UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column("user_id", UUID(as_uuid=True), ForeignKey("Users.id"), nullable=False)
+    game_id = Column("game_id", UUID(as_uuid=True), ForeignKey("Games.id"), nullable=False)
     avg_fps = Column("avg_fps", Integer)
     min_fps = Column("min_fps", Integer)
     max_fps = Column("max_fps", Integer)

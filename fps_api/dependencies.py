@@ -8,7 +8,7 @@ from fps_api.build_db import Users, db
 from fastapi import Depends, Header, HTTPException, status
 from jose import JWTError, jwt
 from sqlalchemy.orm import Session, sessionmaker
-
+from uuid import UUID
 
 def get_session():
     """
@@ -60,10 +60,10 @@ def verify_token(token: str = Depends(get_token_from_header)) -> dict:
         )
 
 
-def get_current_user_id(token_payload: dict = Depends(verify_token)) -> int:
+def get_current_user_id(token_payload: dict = Depends(verify_token)) -> UUID:
     """
     Dependency para extrair o ID do usuário do token JWT.
     Usada em rotas protegidas que precisam do user_id.
     """
 
-    return int(token_payload["sub"])
+    return UUID(token_payload["sub"])

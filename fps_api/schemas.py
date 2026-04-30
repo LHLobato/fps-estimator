@@ -1,5 +1,6 @@
 from pydantic import BaseModel
 from typing import Optional, List
+from uuid import UUID
 
 class InputSchema(BaseModel):
     gamename: str
@@ -47,7 +48,7 @@ class UserCreate(UserBase):
 
 
 class UserResponse(UserBase):
-    id: int
+    id: UUID
     profile_photo: Optional[str] = None
     gpu: Optional[str] = None
     cpu: Optional[str] = None
@@ -86,7 +87,7 @@ class RefreshTokenRequest(BaseModel):
 class UserSignupResponse(BaseModel):
     status: str
     message: str
-    user_id: int
+    user_id: UUID
 
 class PasswordReset(BaseModel):
         new_password: str
@@ -97,6 +98,7 @@ class PasswordReset(BaseModel):
 
 class GameSchema(BaseModel):
     game_name: str
+    game_id: UUID
     avg_fps: int
     min_fps: int
     max_fps: int

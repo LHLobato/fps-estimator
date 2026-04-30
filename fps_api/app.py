@@ -9,6 +9,7 @@ from fps_api.llm_router import llm_router
 from fps_api.hardware_router import hardware_router
 from fps_api.limiter import limiter
 from fps_api.auth_router import auth_router
+from fps_api.game_router import game_router
 app = FastAPI()
 
 origins=[
@@ -32,3 +33,4 @@ async def health():
 app.include_router(llm_router)
 app.include_router(hardware_router)
 app.include_router(auth_router)
+app.include_router(game_router)

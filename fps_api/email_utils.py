@@ -5,7 +5,7 @@ Usado para envio de códigos OTP de autenticação.
 
 import smtplib
 from email.message import EmailMessage
-from auth_config import SMTP_FROM_EMAIL, SMTP_HOST, SMTP_PASS, SMTP_PORT, SMTP_USER
+from fps_api.auth_config import SMTP_FROM_EMAIL, SMTP_HOST, SMTP_PASS, SMTP_PORT, SMTP_USER
 
 def send_email(to_email: str, subject: str, body: str) -> bool:
     """

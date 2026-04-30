@@ -33,7 +33,7 @@ async def estimate_auth(request:Request, input: AuthInputSchema, user_id: int = 
     user = session.query(Users).filter(Users.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User Not Found")
-    
+
     if not all([user.gpu, user.cpu, user.ram]):
         raise HTTPException(status_code=400, detail="Complete your hardware profile before using this route")
 
@@ -44,5 +44,5 @@ async def estimate_auth(request:Request, input: AuthInputSchema, user_id: int = 
         raise e
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
-    
+
     return json.loads(estimated_fps)
