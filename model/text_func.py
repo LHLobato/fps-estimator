@@ -2,6 +2,9 @@ import pandas as pd
 import numpy as np
 
 gpu_features = [
+    "Brand",
+    "Name",
+
     # Compute
     "Render Config__Shading Units",
     "Clock Speeds__Boost Clock",
@@ -98,24 +101,33 @@ def retrieval_gpu_feat(gpu_name: str, gpu_df: pd.DataFrame) -> str:
     return format_gpu_features(row)
 
 cpu_features = [
-    "cores",
-    "logicals",
+    "name",
+    "date",
+    "socket",
+    "category",
     "speed",
     "turbo",
-    "tdp",
-    "date",
-    "category",
-    "rank",
+    "cpuCount",
+    "cores",
+    "logicals",
+    "l1_cache",
+    "l2_cache",
+    "l3_cache",
 ]
 
 CPU_KEY_ALIASES = {
-    "cores":    "cores",
-    "logicals": "threads",
-    "speed":    "base_clock",
-    "turbo":    "boost_clock",
-    "tdp":      "tdp",
+    "name": "name",
+    "date": "date",
+    "socket": "socket",
     "category": "category",
-    "rank":     "benchmark_rank",
+    "speed": "speed",
+    "turbo": "turbo",
+    "cpuCount": "cpu_count",
+    "cores": "cores",
+    "logicals": "threads",
+    "l1_cache": "l1_cache",
+    "l2_cache": "l2_cache",
+    "l3_cache": "l3_cache",
 }
 
 def format_cpu_features(row: pd.Series) -> str:
