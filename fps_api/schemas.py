@@ -112,3 +112,6 @@ class GameSchema(BaseModel):
 class GameListSchema(BaseModel):
     status: str
     items: Optional[List[GameSchema]] = None
+
+class EmbedderSchema(BaseModel):
+    to_be_embedded:str

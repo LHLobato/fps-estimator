@@ -10,7 +10,7 @@ game_router = APIRouter(prefix="/games", tags=["games, analysis"])
 
 @game_router.get("/list")
 @limiter.limit("5/minute")
-async def list_games(request:Request):
+async def list_games(request:Request, session:Session:Depends(get_session)):
     return {"games": GAME_DF['name'].dropna().unique().tolist()}
 
 @game_router.post("/include")

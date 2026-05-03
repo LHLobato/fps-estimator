@@ -10,16 +10,16 @@ from fastapi import Request, Depends
 import asyncio
 from fps_api.dependencies import get_current_user_id, get_session
 from fps_api.build_db import Users
+
 llm_router = APIRouter(
     prefix="/estimate", tags=["estimate, llm, regression"]
 )
-
 @llm_router.post("/ask_llm", response_model=ModelOutputSchema)
 @limiter.limit("5/minute")
 async def estimate(request:Request, input:InputSchema)-> ModelOutputSchema:
     components = {'gpu': input.gpu, 'cpu': input.cpu, 'ram': input.ram}
     try:
-        estimated_fps = await asyncio.to_thread(send_question, components, input.gamename, input.resolution, input.preset, input.upscaling)
+        estimated_fps = await send_question(components, input.gamename, input.preset, input.resolution, input.upscaling, session)
     except HTTPException as e:
         raise e
     except Exception as e:
@@ -39,7 +39,7 @@ async def estimate_auth(request:Request, input: AuthInputSchema, user_id: int = 
 
     components = {'gpu': user.gpu, 'cpu': user.cpu, 'ram': user.ram}
     try:
-        estimated_fps = await asyncio.to_thread(send_question, components, input.gamename, input.resolution, input.preset, input.upscaling)
+        estimated_fps = await send_question(components, input.gamename, input.preset, input.resolution, input.upscaling, session)
     except HTTPException as e:
         raise e
     except Exception as e:

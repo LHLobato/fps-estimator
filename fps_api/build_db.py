@@ -7,6 +7,7 @@ from sqlalchemy import (
 import uuid
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import declarative_base, relationship
+from pgvector.sqlalchemy import Vector
 
 load_dotenv()
 
@@ -50,6 +51,7 @@ class GPU(Base):
     cuda          = Column(String)
     fp16          = Column(String)
     transistors   = Column(String)
+    embedding = Column(Vector(384))
 
     users = relationship("Users", back_populates="gpu_rel")
 
@@ -68,6 +70,7 @@ class CPU(Base):
     l1_cache = Column(Float)
     l2_cache = Column(Float)
     l3_cache = Column(Float)
+    embedding = Column(Vector(384))
 
     users = relationship("Users", back_populates="cpu_rel")
 
@@ -93,6 +96,7 @@ class Game(Base):
     __tablename__ = "games"
     id   = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = Column(String, nullable=False, index=True)
+    embedding = Column(Vector(384))
 
     game_users = relationship("GameUser", back_populates="game", cascade="all, delete-orphan")
 

@@ -42,9 +42,6 @@ auth_router = APIRouter(
 )
 
 
-# ========================
-# Funções auxiliares
-# ========================
 def generate_token(
     user_id: UUID,
     expires_delta: timedelta = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),

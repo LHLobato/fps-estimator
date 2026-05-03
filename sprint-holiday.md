@@ -7,5 +7,5 @@ For the current Sprint the following items must be implemented:
 - Test API + Front-End at least with no auth - Photocopy && Thaumet 
 - Test Local DB scripts and Tables - Photocopy - Done ✅
 - Learn about and test Supabase - Photocopy && Thaumet  
-- Generate Embeddings - Photocopy && Thaumet
-- Implement PG vector retrivial for GPU and CPU with Supabase - Photocopy && Thaumet
+- Generate Embeddings - Photocopy && Thaumet - Almost Done  
+- Implement PG vector retrivial for GPU and CPU with Supabase - Photocopy && Thaumet - Almost Done

@@ -10,7 +10,14 @@ from fps_api.hardware_router import hardware_router
 from fps_api.limiter import limiter
 from fps_api.auth_router import auth_router
 from fps_api.game_router import game_router
-app = FastAPI()
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    yield
+    executor.shutdown(wait=True)
+
+app = FastAPI(lifespan=lifespan)
 
 origins=[
     "http://localhost",
