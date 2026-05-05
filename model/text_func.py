@@ -5,10 +5,22 @@ from fastapi import HTTPException
 from sentence_transformers import SentenceTransformer
 from sqlalchemy.orm import Session
 from sqlalchemy import text
+import uuid
+from fps_api.build_db import GPU, CPU
 
 _model = None
+
 NUM_WORKERS = os.cpu_count() // 2
 executor = ProcessPoolExecutor(max_workers=NUM_WORKERS)
+
+def is_valid_uuid(val: str) -> bool:
+    try:
+        uuid.UUID(str(val))
+        return True
+    except ValueError:
+
+        return False
+
 
 def _get_model():
     global _model
@@ -40,15 +52,18 @@ def _format_row(row, cols: list) -> str:
     return " | ".join(parts)
 
 async def retrieval_gpu_feat(gpu_name: str, session: Session) -> str:
-    embedding = await get_embedding(gpu_name)
-    result = session.execute(
-        text("""
-            SELECT * FROM gpus
-            ORDER BY embedding <=> CAST(:vec AS vector)
-            LIMIT 1
-        """),
-        {"vec": str(embedding)}
-    ).first()
+    if is_valid_uuid(gpu_name):
+        result = session.query(GPU).filter(GPU.id == gpu_name).first()
+    else:
+        embedding = await get_embedding(gpu_name)
+        result = session.execute(
+            text("""
+                SELECT * FROM gpus
+                ORDER BY embedding <=> CAST(:vec AS vector)
+                LIMIT 1
+            """),
+            {"vec": str(embedding)}
+        ).first()
 
     if not result:
         raise HTTPException(status_code=404, detail=f"GPU '{gpu_name}' não encontrada")
@@ -62,15 +77,18 @@ CPU_COLS = [
 ]
 
 async def retrieval_cpu_feat(cpu_name: str, session: Session) -> str:
-    embedding = await get_embedding(cpu_name)
-    result = session.execute(
-        text("""
-            SELECT * FROM cpus
-            ORDER BY embedding <=> CAST(:vec AS vector)
-            LIMIT 1
-        """),
-        {"vec": str(embedding)}
-    ).first()
+    if is_valid_uuid(cpu_name):
+        result = session.query(CPU).filter(CPU.id == cpu_name).first()
+    else:
+        embedding = await get_embedding(cpu_name)
+        result = session.execute(
+            text("""
+                SELECT * FROM cpus
+                ORDER BY embedding <=> CAST(:vec AS vector)
+                LIMIT 1
+            """),
+            {"vec": str(embedding)}
+        ).first()
 
     if not result:
         raise HTTPException(status_code=404, detail=f"CPU '{cpu_name}' não encontrada")

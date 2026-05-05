@@ -8,6 +8,7 @@ import uuid
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import declarative_base, relationship
 from pgvector.sqlalchemy import Vector
+from sqlalchemy import text
 
 load_dotenv()
 
@@ -24,7 +25,7 @@ Base = declarative_base()
 
 class GPU(Base):
     __tablename__ = "gpus"
-    id            = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id            = Column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
     brand         = Column(String)
     name          = Column(String, nullable=False, index=True)
     shading_units = Column(Integer)
@@ -58,7 +59,7 @@ class GPU(Base):
 
 class CPU(Base):
     __tablename__ = "cpus"
-    id       = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id       = Column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
     name     = Column(String, nullable=False, index=True)
     date     = Column(String)
     socket   = Column(String)
@@ -77,7 +78,7 @@ class CPU(Base):
 
 class Users(Base):
     __tablename__ = "users"
-    id            = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id            = Column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
     name          = Column(String)
     email         = Column(String, nullable=False, unique=True, index=True)
     profile_photo = Column(String, nullable=True)
@@ -96,6 +97,7 @@ class Game(Base):
     __tablename__ = "games"
     id   = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = Column(String, nullable=False, index=True)
+    image_url = Column(String, nullable=True)
     embedding = Column(Vector(384))
 
     game_users = relationship("GameUser", back_populates="game", cascade="all, delete-orphan")
@@ -103,7 +105,7 @@ class Game(Base):
 
 class GameUser(Base):
     __tablename__ = "game_users"
-    id         = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id         = Column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
     user_id    = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     game_id    = Column(UUID(as_uuid=True), ForeignKey("games.id"), nullable=False)
     avg_fps    = Column(Integer)
@@ -116,5 +118,8 @@ class GameUser(Base):
     user = relationship("Users", back_populates="game_users")
     game = relationship("Game", back_populates="game_users")
 
+with db.connect() as conn:
+    conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+    conn.commit()
 
 Base.metadata.create_all(bind=db)

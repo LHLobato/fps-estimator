@@ -16,7 +16,7 @@ llm_router = APIRouter(
 )
 @llm_router.post("/ask_llm", response_model=ModelOutputSchema)
 @limiter.limit("5/minute")
-async def estimate(request:Request, input:InputSchema)-> ModelOutputSchema:
+async def estimate(request:Request, input:InputSchema, session:Session=Depends(get_session))-> ModelOutputSchema:
     components = {'gpu': input.gpu, 'cpu': input.cpu, 'ram': input.ram}
     try:
         estimated_fps = await send_question(components, input.gamename, input.preset, input.resolution, input.upscaling, session)
@@ -34,10 +34,10 @@ async def estimate_auth(request:Request, input: AuthInputSchema, user_id: int = 
     if not user:
         raise HTTPException(status_code=404, detail="User Not Found")
 
-    if not all([user.gpu, user.cpu, user.ram]):
+    if not all([user.gpu_id, user.cpu_id, user.ram]):
         raise HTTPException(status_code=400, detail="Complete your hardware profile before using this route")
 
-    components = {'gpu': user.gpu, 'cpu': user.cpu, 'ram': user.ram}
+    components = {'gpu': user.gpu_id, 'cpu': user.cpu_id, 'ram': user.ram}
     try:
         estimated_fps = await send_question(components, input.gamename, input.preset, input.resolution, input.upscaling, session)
     except HTTPException as e:
@@ -45,4 +45,5 @@ async def estimate_auth(request:Request, input: AuthInputSchema, user_id: int = 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
 
+    print(f"RAW LLM OUTPUT: {repr(estimated_fps)}")
     return json.loads(estimated_fps)

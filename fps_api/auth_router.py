@@ -32,7 +32,8 @@ from fps_api.schemas import (
     UserResponse,
 )
 from sqlalchemy.orm import Session
-
+from model.text_func import get_embedding
+from sqlalchemy import text
 
 bcrypt_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -112,6 +113,34 @@ async def create_account(
             detail="Email já cadastrado!",
         )
 
+    gpu_embedding = await get_embedding(user_data.gpu)
+    gpu = session.execute(
+        text("""
+            SELECT id FROM gpus
+            ORDER BY embedding <=> CAST(:vec AS vector)
+            LIMIT 1
+        """),   {"vec": str(gpu_embedding)}).scalar()
+
+    if not gpu:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="GPU not found"
+        )
+
+    cpu_embedding = await get_embedding(user_data.cpu)
+    cpu = session.execute(
+        text("""
+            SELECT id FROM cpus
+            ORDER BY embedding <=> CAST(:vec AS vector)
+            LIMIT 1
+        """),   {"vec": str(cpu_embedding)}).scalar()
+
+    if not cpu:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="GPU not found"
+        )
+
     try:
         hashed_password = bcrypt_context.hash(user_data.password)
 
@@ -124,9 +153,10 @@ async def create_account(
         new_user = Users(
             name=user_data.name or "",
             email=user_data.email,
+            profile_photo=user_data.profile_photo,
             password=hashed_password,
-            gpu=user_data.gpu,
-            cpu=user_data.cpu,
+            gpu_id=gpu,
+            cpu_id=cpu,
             ram=user_data.ram,
             otp_secret=otp_secret,
             ativo=False,
