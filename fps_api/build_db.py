@@ -18,7 +18,7 @@ DB_USER = os.getenv("user")
 DB_PASS = os.getenv("pass")
 DB_NAME = os.getenv("dbname")
 
-DATABASE_URL = f"postgresql://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+DATABASE_URL = f"postgresql+psycopg2://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}?sslmode=require"
 db = create_engine(DATABASE_URL)
 Base = declarative_base()
 
@@ -118,8 +118,10 @@ class GameUser(Base):
     user = relationship("Users", back_populates="game_users")
     game = relationship("Game", back_populates="game_users")
 
-with db.connect() as conn:
-    conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
-    conn.commit()
 
-Base.metadata.create_all(bind=db)
+if __name__ == "__main__":
+    with db.connect() as conn:
+        conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+        conn.commit()
+
+    Base.metadata.create_all(bind=db)

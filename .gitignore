@@ -1,4 +1,4 @@
 .env*
 model/.env
 */__pycache__
-/data/games.xls
+/data/games.csv

@@ -2,12 +2,13 @@ from sentence_transformers import SentenceTransformer
 import pandas as pd
 from tqdm import tqdm
 
-cpu = pd.read_csv("cpu_renamed.csv", index_col=False)
+#cpu = pd.read_csv("cpu_renamed.csv", index_col=False)
 games = pd.read_csv("gamenames.csv", index_col=False)
-gpu = pd.read_csv("gpu_renamed.csv", index_col=False)
+#gpu = pd.read_csv("gpu_renamed.csv", index_col=False)
 
 model = SentenceTransformer("all-MiniLM-L6-v2")
 
+"""
 print("Gerando embeddings GPU...")
 gpu["embedding"] = [
     model.encode(str(name)).tolist()
@@ -22,7 +23,7 @@ cpu["embedding"] = [
     for name in tqdm(cpu["name"])
 ]
 cpu.to_csv("cpu_embedded.csv", index=False)
-print(f"✓ cpu_embedded.csv — {len(cpu)} linhas")
+print(f"✓ cpu_embedded.csv — {len(cpu)} linhas")"""
 
 print("Gerando embeddings Games...")
 games["embedding"] = [
