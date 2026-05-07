@@ -65,6 +65,7 @@ async def retrieval_gpu_feat(gpu_name: str, session: Session) -> str:
             {"vec": str(embedding)}
         ).first()
 
+    print("Trying to retrieve gpu")
     if not result:
         raise HTTPException(status_code=404, detail=f"GPU '{gpu_name}' não encontrada")
 
