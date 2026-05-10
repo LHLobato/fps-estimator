@@ -1,11 +1,20 @@
 from fastapi import Request, APIRouter, HTTPException, Depends, status
 from sqlalchemy import text
 from sqlalchemy.orm import Session
-from fps_api.schemas import UserResponse, UserAlterSetup, UserAlter
+from fps_api.schemas import (
+    UserResponse,
+    UserAlterSetup,
+    UserAlter,
+    ExcludeAccountRequest,
+    ExcludeAccountResponse,
+)
 from fps_api.limiter import limiter
 from fps_api.dependencies import get_current_user_id, get_session
 from fps_api.build_db import Users
 from model.text_func import get_embedding
+from passlib.context import CryptContext
+
+bcrypt_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 user_router = APIRouter(prefix="/profile", tags=["profile", "edit", "setup"])
@@ -92,4 +101,53 @@ async def edit_profile(request: Request, data: UserAlter, session: Session = Dep
         gpu_id=user.gpu_id,
         cpu_id=user.cpu_id,
         ram=user.ram,
+    )
+
+
+@user_router.delete("/exclude-account", response_model=ExcludeAccountResponse)
+@limiter.limit("5/minute")
+async def exclude_account(
+    request: Request,
+    data: ExcludeAccountRequest,
+    session: Session = Depends(get_session),
+    user_id: int = Depends(get_current_user_id),
+):
+    """
+    Endpoint para excluir (deletar) a conta do usuário.
+    
+    Requer autenticação e confirmação de senha.
+    Deleta completamente o usuário do banco de dados, incluindo dados relacionados.
+    
+    Args:
+        data: ExcludeAccountRequest com a senha para confirmação
+        session: Session do banco de dados
+        user_id: ID do usuário autenticado
+        
+    Returns:
+        ExcludeAccountResponse com status e detalhes da exclusão
+        
+    Raises:
+        HTTPException: 404 se usuário não encontrado
+        HTTPException: 401 se senha incorreta
+    """
+    # Buscar o usuário no banco de dados
+    user = session.query(Users).filter(Users.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Validar a senha
+    if not bcrypt_context.verify(data.password, user.password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid password"
+        )
+    
+    # Deletar o usuário (cascade deleta os relacionamentos também)
+    session.delete(user)
+    session.commit()
+    
+    return ExcludeAccountResponse(
+        status="success",
+        message="Account successfully deleted",
+        user_id=user_id,
     )

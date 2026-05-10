@@ -6,7 +6,7 @@ from sentence_transformers import SentenceTransformer
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 import uuid
-from fps_api.build_db import GPU, CPU
+from fps_api.build_db import GPU, CPU, Game
 
 _model = None
 
@@ -95,3 +95,42 @@ async def retrieval_cpu_feat(cpu_name: str, session: Session) -> str:
         raise HTTPException(status_code=404, detail=f"CPU '{cpu_name}' não encontrada")
 
     return _format_row(result, CPU_COLS)
+
+
+async def retrieval_game_info(game_name: str, session: Session) -> dict:
+    """
+    Recupera informações de um jogo (nome e URL da imagem).
+    
+    Busca por UUID ou por similaridade de embedding.
+    
+    Args:
+        game_name: Nome do jogo ou UUID
+        session: Sessão do banco de dados
+        
+    Returns:
+        Dict com id, name e image_url do jogo
+        
+    Raises:
+        HTTPException: 404 se jogo não encontrado
+    """
+    if is_valid_uuid(game_name):
+        result = session.query(Game).filter(Game.id == game_name).first()
+    else:
+        embedding = await get_embedding(game_name)
+        result = session.execute(
+            text("""
+                SELECT * FROM games
+                ORDER BY embedding <=> CAST(:vec AS vector)
+                LIMIT 1
+            """),
+            {"vec": str(embedding)}
+        ).first()
+
+    if not result:
+        raise HTTPException(status_code=404, detail=f"Jogo '{game_name}' não encontrado")
+
+    return {
+        "id": str(result.id),
+        "name": result.name,
+        "image_url": result.image_url,
+    }

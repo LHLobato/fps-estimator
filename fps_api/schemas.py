@@ -115,3 +115,74 @@ class GameListSchema(BaseModel):
 
 class EmbedderSchema(BaseModel):
     to_be_embedded:str
+
+
+class ExcludeAccountRequest(BaseModel):
+    """Schema para requisição de exclusão de conta."""
+    password: str
+
+    class Config:
+        from_attributes = True
+
+
+class ExcludeAccountResponse(BaseModel):
+    """Schema para resposta de exclusão de conta."""
+    status: str
+    message: str
+    user_id: UUID
+
+    class Config:
+        from_attributes = True
+
+
+class GameInfoSchema(BaseModel):
+    """Schema para informações de um jogo (nome e URL da imagem)."""
+    id: UUID
+    name: str
+    image_url: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class GameListInfoSchema(BaseModel):
+    """Schema para lista de informações de jogos."""
+    status: str
+    count: Optional[int] = None
+    games: List[GameInfoSchema]
+
+    class Config:
+        from_attributes = True
+
+
+class GameInfoResponseSchema(BaseModel):
+    """Schema para resposta de informações de um jogo."""
+    status: str
+    game: GameInfoSchema
+
+    class Config:
+        from_attributes = True
+
+
+class AutocompleteItemSchema(BaseModel):
+    """Schema para um item de autocomplete (CPU, GPU ou Game)."""
+    id: UUID
+    name: str
+    type: str  # "cpu", "gpu", or "game"
+    image_url: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class AutocompleteDataSchema(BaseModel):
+    """Schema para dados de autocomplete do frontend."""
+    status: str
+    timestamp: str  # ISO 8601 timestamp
+    cpus: List[AutocompleteItemSchema]
+    gpus: List[AutocompleteItemSchema]
+    games: List[AutocompleteItemSchema]
+    total_items: int
+
+    class Config:
+        from_attributes = True

@@ -12,6 +12,6 @@ For the current Sprint the following items must be implemented:
 
 For FINISHING: 
 
-- Implement User's exclude account 
-- Implement Retrivial Name and img url for games (use functions for gpu and cpu as base)
-- Implement Front-End completion for user's digits (user digits only if not appear in auto complete) - How can it be done? Frontend caches the list with all cpu's, gpu's and game's names?
+- Implement User's exclude account - Done ✅
+- Implement Retrivial Name and img url for games (use functions for gpu and cpu as base) - Done ✅
+- Implement Front-End completion for user's digits (user digits only if not appear in auto complete) - Done ✅

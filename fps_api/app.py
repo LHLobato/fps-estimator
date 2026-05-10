@@ -11,6 +11,7 @@ from fps_api.limiter import limiter
 from fps_api.auth_router import auth_router
 from fps_api.game_router import game_router
 from fps_api.user_router import user_router
+from fps_api.autocomplete_router import autocomplete_router
 from contextlib import asynccontextmanager
 from model.text_func import executor
 
@@ -44,3 +45,4 @@ app.include_router(hardware_router)
 app.include_router(auth_router)
 app.include_router(game_router)
 app.include_router(user_router)
+app.include_router(autocomplete_router)
