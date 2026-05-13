@@ -78,16 +78,16 @@ async def user_list(request: Request, user_id: int = Depends(get_current_user_id
 async def list_games_with_info(request: Request, session: Session = Depends(get_session)):
     """
     Lista todos os jogos disponíveis com nome e URL da imagem.
-    
+
     Returns:
         GameListInfoSchema com lista de jogos contendo id, name e image_url
     """
     games = session.query(Game).with_entities(
-        Game.id, 
-        Game.name, 
+        Game.id,
+        Game.name,
         Game.image_url
     ).all()
-    
+
     return GameListInfoSchema(
         status="ok",
         count=len(games),
@@ -111,20 +111,20 @@ async def get_game_info(
 ):
     """
     Recupera informações de um jogo específico (nome e URL da imagem).
-    
+
     Busca por UUID ou por nome (usando vector similarity search).
-    
+
     Args:
         game_identifier: UUID do jogo ou nome (será buscar por similaridade)
-        
+
     Returns:
         GameInfoResponseSchema com id, name e image_url do jogo
-        
+
     Raises:
         HTTPException: 404 se jogo não encontrado
     """
     game_info = await retrieval_game_info(game_identifier, session)
-    
+
     return GameInfoResponseSchema(
         status="ok",
         game=GameInfoSchema(**game_info)
