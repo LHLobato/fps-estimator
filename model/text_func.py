@@ -1,8 +1,8 @@
 import os
 import asyncio
-from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import ThreadPoolExecutor
 from fastapi import HTTPException
-from sentence_transformers import SentenceTransformer
+# from sentence_transformers import SentenceTransformer  # Lazy import
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 import uuid
@@ -10,8 +10,8 @@ from fps_api.build_db import GPU, CPU, Game
 
 _model = None
 
-NUM_WORKERS = os.cpu_count() // 2
-executor = ProcessPoolExecutor(max_workers=NUM_WORKERS)
+NUM_WORKERS = os.cpu_count() or 2
+executor = ThreadPoolExecutor(max_workers=NUM_WORKERS)
 
 def is_valid_uuid(val: str) -> bool:
     try:
@@ -25,6 +25,7 @@ def is_valid_uuid(val: str) -> bool:
 def _get_model():
     global _model
     if _model is None:
+        from sentence_transformers import SentenceTransformer
         _model = SentenceTransformer("all-MiniLM-L6-v2")
     return _model
 

@@ -11,7 +11,7 @@ from fps_api.schemas import (
 from fps_api.limiter import limiter
 from fps_api.dependencies import get_current_user_id, get_session
 from fps_api.build_db import Users
-from model.text_func import get_embedding
+# from model.text_func import get_embedding  # Lazy import
 from passlib.context import CryptContext
 
 bcrypt_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -22,6 +22,9 @@ user_router = APIRouter(prefix="/profile", tags=["profile", "edit", "setup"])
 @user_router.post("/edit_setup", response_model=UserResponse)
 @limiter.limit("5/minute")
 async def edit_setup(request: Request, data: UserAlterSetup, session: Session = Depends(get_session), user_id: int = Depends(get_current_user_id)):
+    # Lazy import para evitar sentence_transformers no startup
+    from model.text_func import get_embedding
+    
     user = session.query(Users).filter(Users.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not Found")
@@ -67,6 +70,9 @@ async def edit_setup(request: Request, data: UserAlterSetup, session: Session = 
 @user_router.post("/edit", response_model=UserResponse)
 @limiter.limit("5/minute")
 async def edit_profile(request: Request, data: UserAlter, session: Session = Depends(get_session), user_id: int = Depends(get_current_user_id)):
+    # Lazy import para evitar sentence_transformers no startup
+    from model.text_func import get_embedding
+    
     user = session.query(Users).filter(Users.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not Found")

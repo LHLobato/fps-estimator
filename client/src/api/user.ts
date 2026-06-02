@@ -24,8 +24,8 @@ export interface UserResponse {
   name?: string;
   email: string;
   profile_photo?: string;
-  gpu_id?: string;
-  cpu_id?: string;
+  gpu?: string;
+  cpu?: string;
   ram?: string;
 }
 
@@ -40,6 +40,12 @@ export interface ExcludeAccountResponse {
 }
 
 // --- FUNÇÕES DE API ---
+
+// Obtém os dados do usuário atual autenticado (Requer Autenticação)
+export async function get_current_user(): Promise<UserResponse> {
+  const response = await api.get<UserResponse>("/auth/me");
+  return response.data;
+}
 
 // Atualiza especificamente o setup (hardware) do usuário (Requer Autenticação)
 export async function edit_user_setup(

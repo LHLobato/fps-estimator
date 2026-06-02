@@ -1,50 +1,172 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { GlassPanel } from '../components/GlassPanel';
+import * as hardwareAPI from '../api/hardware';
+import * as userAPI from '../api/user';
+import * as gamesAPI from '../api/games';
 
 export default function User() {
+  // Estado do usuário
+  const [userData, setUserData] = useState(null);
   const [systemConfig, setSystemConfig] = useState({
-    cpu: 'Intel Core i9-13900K',
-    gpu: 'NVIDIA RTX 4090',
-    ram: '64GB DDR5 6000MHz'
+    cpu: '',
+    gpu: '',
+    ram: ''
   });
+  const [editingField, setEditingField] = useState(null);
 
-  const [games, setGames] = useState([
-    {
-      id: 1,
-      title: 'CYBERPUNK_2077',
-      fps: 94,
-      tag: 'RTX_READY',
-      image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAMIOLj7B3Fye-WTRLNIJBR3RCh-gE5UevbhWdKAKaNP8uLsfAfRXG8gdOToV9HVdrTF5-_QiUXLP61sQdBp5Fmkovlcv4-HzreuGifLNZdg1DK_VpDbewwGITL45OTYLJP809AKjoN1BBnBMABT8hjSUzvzRi_Zm0ighwMdtkO5WCLXXndwN4QPAbwSa4UYz8FnupLAWkhxdXACR38gGFqsHSj4xiuE2ssVbLRkUBlu5BZQapcbHtN2g26R79fTb7WrmVSsC6xtcw',
-      tagColor: 'cyan'
-    },
-    {
-      id: 2,
-      title: 'ELDEN_RING',
-      fps: 60,
-      tag: 'STRESS_TEST',
-      image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCYkI2j1nyy3GPAuLPbFoq1rEEpQQFt7cNdtUYIoQMIh49tJuHnhg5LJoU1WrsHR2V9Ku82Pf7auY3udUGYmr41L8eDoS3DCKXuTRXLzhPZcnOm3L48o_szzo2OcdbFX_kCBvgJNO9IlNxXhZM6Y2X-0jzkVEvsiRqKNFGeip_FSegKZhwaYIZE-Pq4-hEmcEVhyqv3Hy8lCvqwmhPwr0iawx6PY03RnfRkQdGUkdwG0EUG3K75JczRUq_Xn0ZDiykSkvg6QtiJ0xQ',
-      tagColor: 'violet'
-    },
-    {
-      id: 3,
-      title: 'FORZA_HORIZON_5',
-      fps: 144,
-      tag: 'OPTIMIZED',
-      image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDi3F4PE5TEST9TEXfC2C3tws_HRbsG7K7qI0yEob4PnXnxAtI2YlbDDUGGxz-E7t2PvKfxkWlOFs1MMiaDi6ZqSGmNWs0-i6vIi_BNn8MMy9c9j8DpuvtKg-n2i2Q0QxgDztGhafFgDuSfenEgydFX2NpzOHCJ0P7CSB1xYXfwhGzXTSMP3zQeva1eAJRDtTNaVSItZ2yr79fEW-lUYsE4VUhQl9fDhfn7nbhIIDpMqTHzat3PpDB99ca-COSU-DQ-No9QtJzd8Ws',
-      tagColor: 'cyan'
-    },
-    {
-      id: 4,
-      title: 'WARZONE_2.0',
-      fps: 128,
-      tag: 'RTX_READY',
-      image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBUunx1jbjsZgU2RUcLDfdA2PuMYvoHvJPTCH7gf1u5LRMxTCT5KbJl2iwh5cg99KDIEADTrKJu8cu4-TI_I_JEId-LtGxgSlofV1CJLB5huSDzKNbv65Ubsq9LCT8KO67AH0r1vddgReIAYcAT7N1rhd8U-SNBscZo45MslrkUcIGG3mUbOyl7nT2qAfBZek7rjhb9OS2v51v_ulSmJBPw6A59Bt_iAzvTaUnor3XNA_n8PrHEZ09o9QmQrXx8OnCUDaKAFPmzses',
-      tagColor: 'cyan'
-    }
+  // Estado para hardware disponível
+  const [cpus, setCpus] = useState([]);
+  const [gpus, setGpus] = useState([]);
+  const [rams] = useState([
+    '128GB DDR5',
+    '64GB DDR5',
+    '32GB DDR5',
+    '16GB DDR5',
+    '8GB DDR5',
+    '4GB DDR5',
+    '128GB DDR4',
+    '64GB DDR4',
+    '32GB DDR4',
+    '16GB DDR4',
+    '8GB DDR4',
+    '4GB DDR4',
+    '128GB DDR3',
+    '64GB DDR3',
+    '32GB DDR3',
+    '16GB DDR3',
+    '8GB DDR3',
+    '4GB DDR3',
   ]);
 
-  const handleUpdateSystem = () => {
-    alert('System configuration updated successfully!');
+  // Estado de busca
+  const [cpuSearch, setCpuSearch] = useState('');
+  const [gpuSearch, setGpuSearch] = useState('');
+  const [ramSearch, setRamSearch] = useState('');
+
+  // Estado dos jogos
+  const [games, setGames] = useState([]);
+  const [userGames, setUserGames] = useState([]);
+  const [loadingUser, setLoadingUser] = useState(true);
+  const [loadingGames, setLoadingGames] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+
+  // Carregar dados do usuário e hardware
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setLoadingUser(true);
+        const [user, gpuList, cpuList, gamesList] = await Promise.all([
+          userAPI.get_current_user(),
+          hardwareAPI.get_gpus_list(),
+          hardwareAPI.get_cpus_list(),
+          gamesAPI.get_all_games_info(),
+        ]);
+
+        setUserData(user);
+        setSystemConfig({
+          cpu: user.cpu || '',
+          gpu: user.gpu || '',
+          ram: user.ram || ''
+        });
+
+        const gpuNames = Array.isArray(gpuList.gpus) ? gpuList.gpus.map((g) => (typeof g === 'string' ? g : g.name)) : [];
+        const cpuNames = Array.isArray(cpuList.cpus) ? cpuList.cpus.map((c) => (typeof c === 'string' ? c : c.name)) : [];
+        
+        setCpus(cpuNames);
+        setGpus(gpuNames);
+
+        // Processar jogos
+        if (gamesList.games && Array.isArray(gamesList.games)) {
+          setGames(gamesList.games);
+        }
+      } catch (err) {
+        setError('Erro ao carregar dados do perfil');
+        console.error('Erro completo:', err);
+      } finally {
+        setLoadingUser(false);
+      }
+    };
+
+    loadData();
+  }, []);
+
+  // Carregar jogos do usuário
+  useEffect(() => {
+    const loadUserGames = async () => {
+      try {
+        setLoadingGames(true);
+        const response = await gamesAPI.get_user_games();
+        if (response.items) {
+          setUserGames(response.items);
+        }
+      } catch (err) {
+        console.error('Erro ao carregar jogos do usuário:', err);
+      } finally {
+        setLoadingGames(false);
+      }
+    };
+
+    loadUserGames();
+  }, []);
+
+  // Função de filtro inteligente
+  const intelligentFilter = (items, searchTerm, limit = 3) => {
+    if (!searchTerm) return items;
+    
+    const term = searchTerm.toLowerCase().trim();
+    const searchWords = term.split(/\s+/);
+    
+    const scored = items.map((item) => {
+      const itemLower = item.toLowerCase();
+      let score = 0;
+      
+      if (itemLower.startsWith(term)) {
+        score += 1000;
+      }
+      
+      searchWords.forEach((word) => {
+        if (itemLower.startsWith(word)) {
+          score += 500;
+        } else if (itemLower.includes(` ${word}`)) {
+          score += 250;
+        } else if (itemLower.includes(word)) {
+          score += 100;
+        }
+      });
+      
+      return { item, score };
+    });
+    
+    return scored
+      .filter(({ score }) => score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, limit)
+      .map(({ item }) => item);
+  };
+
+  const filteredCpus = intelligentFilter(cpus, cpuSearch);
+  const filteredGpus = intelligentFilter(gpus, gpuSearch);
+  const filteredRams = intelligentFilter(rams, ramSearch);
+
+  // Atualizar configuração do sistema
+  const handleUpdateSystem = async () => {
+    if (!systemConfig.cpu || !systemConfig.gpu || !systemConfig.ram) {
+      setError('Preencha todos os campos de hardware');
+      return;
+    }
+
+    try {
+      setError('');
+      setSuccess('');
+      const updated = await userAPI.edit_user_setup(systemConfig);
+      setUserData(updated);
+      setEditingField(null);
+      setSuccess('Configuração de hardware atualizada com sucesso!');
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err) {
+      setError(err.message || 'Erro ao atualizar configuração');
+    }
   };
 
   const handleConfigChange = (field, value) => {
@@ -60,9 +182,21 @@ export default function User() {
       <div className="mb-10">
         <h1 className="font-headline-xl text-cyan-400 mb-2 uppercase">Neural Library</h1>
         <p className="font-body-lg text-on-surface-variant max-w-2xl">
-          Access your archived performance metrics and hardware configurations across the meta-network.
+          {loadingUser ? 'Carregando perfil...' : `Bem-vindo, ${userData?.name || userData?.email || 'Usuário'}!`}
         </p>
       </div>
+
+      {error && (
+        <div className="mb-6 p-4 bg-red-900/20 border border-red-500/40 rounded">
+          <p className="text-red-400 text-sm">{error}</p>
+        </div>
+      )}
+
+      {success && (
+        <div className="mb-6 p-4 bg-green-900/20 border border-green-500/40 rounded">
+          <p className="text-green-400 text-sm">{success}</p>
+        </div>
+      )}
 
       {/* Dashboard Bento Grid */}
       <div className="grid grid-cols-12 gap-gutter">
@@ -73,60 +207,170 @@ export default function User() {
               <span className="material-symbols-outlined text-cyan-400">memory</span>
               <h3 className="font-label-caps text-on-surface">Current Rig Configuration</h3>
             </div>
-            <span className="font-label-caps text-[10px] text-cyan-400/50">SYSTEM_ID: X-9900_V</span>
+            <span className="font-label-caps text-[10px] text-cyan-400/50">USER_ID: {userData?.id?.slice(0, 8)}</span>
           </div>
 
           <div className="p-8 grid grid-cols-1 md:grid-cols-3 gap-8">
             {/* CPU Field */}
             <div className="space-y-2">
               <label className="font-label-caps text-xs text-on-surface-variant">Central Processing Unit</label>
-              <div className="relative group">
-                <input
-                  type="text"
-                  value={systemConfig.cpu}
-                  onChange={(e) => handleConfigChange('cpu', e.target.value)}
-                  className="w-full bg-slate-900/40 border-0 border-b border-cyan-500/30 py-3 px-0 font-headline-md text-cyan-400 focus:ring-0 focus:border-cyan-400 focus:bg-cyan-500/5 transition-all outline-none"
-                />
-                <div className="absolute bottom-0 left-0 h-[2px] w-0 bg-cyan-400 group-focus-within:w-full transition-all duration-300"></div>
-              </div>
+              {editingField === 'cpu' ? (
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Search CPU..."
+                    value={cpuSearch}
+                    onChange={(e) => setCpuSearch(e.target.value)}
+                    className="w-full bg-slate-900/40 border-0 border-b border-cyan-500/30 py-3 px-0 font-headline-md text-cyan-400 focus:ring-0 focus:border-cyan-400 focus:bg-cyan-500/5 transition-all outline-none"
+                  />
+                  {cpuSearch && filteredCpus.length > 0 && (
+                    <div className="absolute top-full left-0 right-0 bg-slate-900 border border-cyan-500/40 rounded mt-2 max-h-40 overflow-y-auto z-50">
+                      {filteredCpus.map((cpu) => (
+                        <button
+                          key={cpu}
+                          type="button"
+                          onClick={() => {
+                            handleConfigChange('cpu', cpu);
+                            setCpuSearch('');
+                          }}
+                          className="w-full px-4 py-2 text-left text-cyan-300 hover:bg-cyan-500/30 transition-colors text-sm"
+                        >
+                          {cpu}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div
+                  onClick={() => setEditingField('cpu')}
+                  className="relative group cursor-pointer"
+                >
+                  <input
+                    type="text"
+                    value={systemConfig.cpu}
+                    readOnly
+                    className="w-full bg-slate-900/40 border-0 border-b border-cyan-500/30 py-3 px-0 font-headline-md text-cyan-400 focus:ring-0 focus:border-cyan-400 focus:bg-cyan-500/5 transition-all outline-none cursor-pointer"
+                  />
+                  <div className="absolute bottom-0 left-0 h-[2px] w-0 bg-cyan-400 group-hover:w-full transition-all duration-300"></div>
+                </div>
+              )}
               <p className="font-label-caps text-[9px] text-slate-500">MAX_FREQ: 5.8GHZ</p>
             </div>
 
             {/* GPU Field */}
             <div className="space-y-2">
               <label className="font-label-caps text-xs text-on-surface-variant">Graphics Processor</label>
-              <div className="relative group">
-                <input
-                  type="text"
-                  value={systemConfig.gpu}
-                  onChange={(e) => handleConfigChange('gpu', e.target.value)}
-                  className="w-full bg-slate-900/40 border-0 border-b border-cyan-500/30 py-3 px-0 font-headline-md text-cyan-400 focus:ring-0 focus:border-cyan-400 focus:bg-cyan-500/5 transition-all outline-none"
-                />
-                <div className="absolute bottom-0 left-0 h-[2px] w-0 bg-cyan-400 group-focus-within:w-full transition-all duration-300"></div>
-              </div>
+              {editingField === 'gpu' ? (
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Search GPU..."
+                    value={gpuSearch}
+                    onChange={(e) => setGpuSearch(e.target.value)}
+                    className="w-full bg-slate-900/40 border-0 border-b border-cyan-500/30 py-3 px-0 font-headline-md text-cyan-400 focus:ring-0 focus:border-cyan-400 focus:bg-cyan-500/5 transition-all outline-none"
+                  />
+                  {gpuSearch && filteredGpus.length > 0 && (
+                    <div className="absolute top-full left-0 right-0 bg-slate-900 border border-cyan-500/40 rounded mt-2 max-h-40 overflow-y-auto z-50">
+                      {filteredGpus.map((gpu) => (
+                        <button
+                          key={gpu}
+                          type="button"
+                          onClick={() => {
+                            handleConfigChange('gpu', gpu);
+                            setGpuSearch('');
+                          }}
+                          className="w-full px-4 py-2 text-left text-cyan-300 hover:bg-cyan-500/30 transition-colors text-sm"
+                        >
+                          {gpu}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div
+                  onClick={() => setEditingField('gpu')}
+                  className="relative group cursor-pointer"
+                >
+                  <input
+                    type="text"
+                    value={systemConfig.gpu}
+                    readOnly
+                    className="w-full bg-slate-900/40 border-0 border-b border-cyan-500/30 py-3 px-0 font-headline-md text-cyan-400 focus:ring-0 focus:border-cyan-400 focus:bg-cyan-500/5 transition-all outline-none cursor-pointer"
+                  />
+                  <div className="absolute bottom-0 left-0 h-[2px] w-0 bg-cyan-400 group-hover:w-full transition-all duration-300"></div>
+                </div>
+              )}
               <p className="font-label-caps text-[9px] text-slate-500">VRAM: 24GB GDDR6X</p>
             </div>
 
             {/* RAM Field */}
             <div className="space-y-2">
               <label className="font-label-caps text-xs text-on-surface-variant">System Memory</label>
-              <div className="relative group">
-                <input
-                  type="text"
-                  value={systemConfig.ram}
-                  onChange={(e) => handleConfigChange('ram', e.target.value)}
-                  className="w-full bg-slate-900/40 border-0 border-b border-cyan-500/30 py-3 px-0 font-headline-md text-cyan-400 focus:ring-0 focus:border-cyan-400 focus:bg-cyan-500/5 transition-all outline-none"
-                />
-                <div className="absolute bottom-0 left-0 h-[2px] w-0 bg-cyan-400 group-focus-within:w-full transition-all duration-300"></div>
-              </div>
+              {editingField === 'ram' ? (
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Search RAM..."
+                    value={ramSearch}
+                    onChange={(e) => setRamSearch(e.target.value)}
+                    className="w-full bg-slate-900/40 border-0 border-b border-cyan-500/30 py-3 px-0 font-headline-md text-cyan-400 focus:ring-0 focus:border-cyan-400 focus:bg-cyan-500/5 transition-all outline-none"
+                  />
+                  {ramSearch && filteredRams.length > 0 && (
+                    <div className="absolute top-full left-0 right-0 bg-slate-900 border border-cyan-500/40 rounded mt-2 max-h-40 overflow-y-auto z-50">
+                      {filteredRams.map((ram) => (
+                        <button
+                          key={ram}
+                          type="button"
+                          onClick={() => {
+                            handleConfigChange('ram', ram);
+                            setRamSearch('');
+                          }}
+                          className="w-full px-4 py-2 text-left text-cyan-300 hover:bg-cyan-500/30 transition-colors text-sm"
+                        >
+                          {ram}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div
+                  onClick={() => setEditingField('ram')}
+                  className="relative group cursor-pointer"
+                >
+                  <input
+                    type="text"
+                    value={systemConfig.ram}
+                    readOnly
+                    className="w-full bg-slate-900/40 border-0 border-b border-cyan-500/30 py-3 px-0 font-headline-md text-cyan-400 focus:ring-0 focus:border-cyan-400 focus:bg-cyan-500/5 transition-all outline-none cursor-pointer"
+                  />
+                  <div className="absolute bottom-0 left-0 h-[2px] w-0 bg-cyan-400 group-hover:w-full transition-all duration-300"></div>
+                </div>
+              )}
               <p className="font-label-caps text-[9px] text-slate-500">LATENCY: CL30</p>
             </div>
           </div>
 
-          <div className="px-8 pb-8 flex justify-end">
+          <div className="px-8 pb-8 flex justify-end gap-3">
+            {editingField && (
+              <button
+                onClick={() => {
+                  setEditingField(null);
+                  setCpuSearch('');
+                  setGpuSearch('');
+                  setRamSearch('');
+                }}
+                className="bg-slate-700 text-white font-label-caps py-3 px-8 rounded-lg font-bold hover:bg-slate-600 transition-all active:scale-95"
+              >
+                CANCEL
+              </button>
+            )}
             <button
               onClick={handleUpdateSystem}
-              className="bg-gradient-to-r from-cyan-400 to-violet-500 text-slate-950 font-label-caps py-3 px-8 rounded-lg font-bold hover:scale-105 transition-all shadow-[0_0_20px_rgba(0,240,255,0.3)] active:scale-95"
+              disabled={!editingField}
+              className="bg-gradient-to-r from-cyan-400 to-violet-500 text-slate-950 font-label-caps py-3 px-8 rounded-lg font-bold hover:scale-105 transition-all shadow-[0_0_20px_rgba(0,240,255,0.3)] active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
             >
               UPDATE SYSTEM ARCHITECTURE
             </button>
@@ -144,24 +388,24 @@ export default function User() {
             <div className="space-y-4">
               <div className="flex justify-between items-end border-b border-white/5 pb-2">
                 <div>
-                  <p className="font-label-caps text-[10px] text-slate-500">LAST ESTIMATION</p>
-                  <p className="font-body-md text-on-surface">Starfield 4K Ultra</p>
+                  <p className="font-label-caps text-[10px] text-slate-500">TOTAL_GAMES</p>
+                  <p className="font-body-md text-on-surface">Estimados</p>
                 </div>
                 <div className="text-right">
                   <p className="font-data-display text-2xl text-cyan-400">
-                    82 <span className="text-xs font-label-caps">FPS</span>
+                    {userGames.length || 0} <span className="text-xs font-label-caps">JOGOS</span>
                   </p>
                 </div>
               </div>
 
               <div className="flex justify-between items-end border-b border-white/5 pb-2">
                 <div>
-                  <p className="font-label-caps text-[10px] text-slate-500">SYSTEM STABILITY</p>
-                  <p className="font-body-md text-on-surface">Thermal Stress Test</p>
+                  <p className="font-label-caps text-[10px] text-slate-500">SYSTEM STATUS</p>
+                  <p className="font-body-md text-on-surface">Configurado</p>
                 </div>
                 <div className="text-right">
                   <p className="font-data-display text-2xl text-violet-400">
-                    99.8 <span className="text-xs font-label-caps">%</span>
+                    {systemConfig.cpu && systemConfig.gpu && systemConfig.ram ? '✓ OK' : '✗ INCOMPLETE'}
                   </p>
                 </div>
               </div>
@@ -197,6 +441,9 @@ export default function User() {
             <div className="flex items-center gap-3">
               <span className="material-symbols-outlined text-cyan-400">grid_view</span>
               <h3 className="font-label-caps text-on-surface">Your Neural Library</h3>
+              <span className="font-label-caps text-xs text-slate-500">
+                {userGames.length} / {games.length}
+              </span>
             </div>
             <button className="flex items-center gap-2 font-label-caps text-xs text-cyan-400 hover:text-white transition-colors">
               <span className="material-symbols-outlined text-sm">add</span>
@@ -204,48 +451,61 @@ export default function User() {
             </button>
           </div>
 
-          <div className="p-gutter grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
-            {/* Game Cards */}
-            {games.map((game) => (
-              <div
-                key={game.id}
-                className="group relative aspect-[3/4] rounded-lg overflow-hidden border border-white/10 hover:border-cyan-500/50 transition-all"
-              >
-                <img
-                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                  src={game.image}
-                  alt={game.title}
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent flex flex-col justify-end p-4">
-                  <span
-                    className={`bg-${game.tagColor}-500/20 text-${game.tagColor}-400 border border-${game.tagColor}-500/40 font-label-caps text-[8px] w-fit px-2 py-0.5 rounded-full mb-2`}
-                    style={{
-                      backgroundColor: game.tagColor === 'cyan' ? 'rgba(0, 240, 255, 0.2)' : 'rgba(168, 85, 247, 0.2)',
-                      color: game.tagColor === 'cyan' ? '#00f0ff' : '#c084fc',
-                      borderColor: game.tagColor === 'cyan' ? 'rgba(0, 240, 255, 0.4)' : 'rgba(168, 85, 247, 0.4)'
-                    }}
-                  >
-                    {game.tag}
-                  </span>
-                  <h4 className="font-headline-md text-sm text-white mb-1">{game.title}</h4>
-                  <div className="flex justify-between items-center">
-                    <span className="font-label-caps text-[9px] text-slate-400">FPS AVG: {game.fps}</span>
-                    <span className="material-symbols-outlined text-cyan-400 text-lg group-hover:translate-x-1 transition-transform">
-                      play_arrow
+          {loadingGames ? (
+            <div className="p-gutter">
+              <p className="text-slate-400">Carregando jogos...</p>
+            </div>
+          ) : userGames.length > 0 ? (
+            <div className="p-gutter grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+              {/* Game Cards - Jogos do Usuário */}
+              {userGames.map((game, idx) => (
+                <div
+                  key={idx}
+                  className="group relative aspect-[3/4] rounded-lg overflow-hidden border border-cyan-500/40 hover:border-cyan-400 transition-all"
+                >
+                  {game.image_url ? (
+                    <img
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                      src={game.image_url}
+                      alt={game.game_name}
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-slate-800 flex items-center justify-center">
+                      <p className="text-slate-500 text-xs">{game.game_name}</p>
+                    </div>
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent flex flex-col justify-end p-4">
+                    <span
+                      className="bg-cyan-500/20 text-cyan-400 border border-cyan-500/40 font-label-caps text-[8px] w-fit px-2 py-0.5 rounded-full mb-2"
+                    >
+                      FPS: {game.avg_fps}
                     </span>
+                    <h4 className="font-headline-md text-sm text-white mb-1">{game.game_name}</h4>
+                    <div className="flex justify-between items-center">
+                      <span className="font-label-caps text-[9px] text-slate-400">
+                        {game.preset} • {game.resolution}
+                      </span>
+                      <span className="material-symbols-outlined text-cyan-400 text-lg group-hover:translate-x-1 transition-transform">
+                        play_arrow
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))}
 
-            {/* Add New Placeholder */}
-            <button className="aspect-[3/4] rounded-lg border-2 border-dashed border-cyan-500/20 bg-cyan-500/5 flex flex-col items-center justify-center gap-4 hover:bg-cyan-500/10 hover:border-cyan-500/40 transition-all group">
-              <div className="w-16 h-16 rounded-full border border-cyan-500/30 flex items-center justify-center group-hover:scale-110 transition-transform">
-                <span className="material-symbols-outlined text-3xl text-cyan-400">add</span>
-              </div>
-              <span className="font-label-caps text-xs text-slate-400 group-hover:text-cyan-400">ADD NEW TITLE</span>
-            </button>
-          </div>
+              {/* Placeholder para adicionar novo */}
+              <button className="aspect-[3/4] rounded-lg border-2 border-dashed border-cyan-500/20 bg-cyan-500/5 flex flex-col items-center justify-center gap-4 hover:bg-cyan-500/10 hover:border-cyan-500/40 transition-all group">
+                <div className="w-16 h-16 rounded-full border border-cyan-500/30 flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <span className="material-symbols-outlined text-3xl text-cyan-400">add</span>
+                </div>
+                <span className="font-label-caps text-xs text-slate-400 group-hover:text-cyan-400">ADD NEW TITLE</span>
+              </button>
+            </div>
+          ) : (
+            <div className="p-gutter">
+              <p className="text-slate-400 text-center py-12">Você ainda não tem jogos estimados. Vá para a página de <strong>Estimate</strong> para começar!</p>
+            </div>
+          )}
         </section>
       </div>
     </div>

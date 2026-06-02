@@ -13,20 +13,28 @@ def send_email(to_email: str, subject: str, body: str) -> bool:
     Retorna True se enviado com sucesso, False caso contrário.
     """
     try:
+        print(f"[EMAIL] Iniciando envio para {to_email}")
         msg = EmailMessage()
         msg["Subject"] = subject
         msg["From"] = SMTP_FROM_EMAIL
         msg["To"] = to_email
         msg.set_content(body)
 
+        print(f"[EMAIL] Conectando ao {SMTP_HOST}:{SMTP_PORT}")
         with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
+            print(f"[EMAIL] Iniciando TLS")
             server.starttls()
+            print(f"[EMAIL] Fazendo login com {SMTP_USER}")
             server.login(SMTP_USER, SMTP_PASS)
+            print(f"[EMAIL] Enviando mensagem")
             server.send_message(msg)
 
+        print(f"[EMAIL] ✅ Email enviado com sucesso para {to_email}")
         return True
     except Exception as e:
-        print(f"Erro ao enviar email para {to_email}: {e}")
+        print(f"[EMAIL] ❌ Erro ao enviar email para {to_email}: {e}")
+        import traceback
+        traceback.print_exc()
         return False
 
 

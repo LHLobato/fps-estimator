@@ -2,15 +2,21 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import * as authAPI from '../api/auth';
 
-export default function Login() {
+export default function SignUp() {
   const navigate = useNavigate();
-  const [step, setStep] = useState('login'); // 'login' ou 'verify_code'
+  const [step, setStep] = useState('register'); // 'register' ou 'verify_code'
   const [formData, setFormData] = useState({
     email: '',
-    password: ''
+    password: '',
+    confirmPassword: '',
+    name: '',
+    gpu: '',
+    cpu: '',
+    ram: ''
   });
   const [code, setCode] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -23,20 +29,67 @@ export default function Login() {
     }));
   };
 
+  const validateForm = () => {
+    if (!formData.email || !formData.password || !formData.confirmPassword || !formData.name) {
+      setError('Please fill all required fields');
+      return false;
+    }
+
+    if (formData.password !== formData.confirmPassword) {
+      setError('Passwords do not match');
+      return false;
+    }
+
+    if (formData.password.length < 6) {
+      setError('Password must be at least 6 characters');
+      return false;
+    }
+
+    return true;
+  };
+
+  const getErrorMessage = (error) => {
+    // Se for array de erros de validação (422)
+    if (Array.isArray(error.response?.data?.detail)) {
+      return error.response.data.detail[0]?.msg || 'Validation error';
+    }
+    // Se for objeto com detail
+    if (error.response?.data?.detail) {
+      if (typeof error.response.data.detail === 'string') {
+        return error.response.data.detail;
+      }
+      return JSON.stringify(error.response.data.detail);
+    }
+    // Fallback
+    return error.message || 'Error creating account';
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setSuccess('');
-    
-    if (step === 'login') {
-      // Etapa 1: Enviar email e senha
+
+    if (step === 'register') {
+      // Validar formulário
+      if (!validateForm()) return;
+
+      // Etapa 1: Criar conta e enviar OTP
       setIsLoading(true);
       try {
-        const response = await authAPI.login(formData);
-        setSuccess(response.message || 'Código de verificação enviado para seu email!');
+        const response = await authAPI.sign_in({
+          email: formData.email,
+          password: formData.password,
+          name: formData.name,
+          profile_photo: null,
+          gpu: formData.gpu || 'Not specified',
+          cpu: formData.cpu || 'Not specified',
+          ram: formData.ram || 'Not specified'
+        });
+        setSuccess(response.message || 'Verification code sent to your email!');
         setStep('verify_code');
       } catch (err) {
-        setError(err.response?.data?.detail || 'Erro ao fazer login');
+        console.error('Signup error:', err.response?.data);
+        setError(getErrorMessage(err));
       } finally {
         setIsLoading(false);
       }
@@ -44,40 +97,31 @@ export default function Login() {
       // Etapa 2: Verificar código
       setIsLoading(true);
       try {
-        const response = await authAPI.verify_code_login({
+        const response = await authAPI.verify_code_sign({
           email: formData.email,
           code
         });
-        
-        console.log('[LOGIN] Token recebido:', { access_token: !!response.access_token });
-        
+
         // Salvar tokens
         localStorage.setItem('access_token', response.access_token);
         if (response.refresh_token) {
           localStorage.setItem('refresh_token', response.refresh_token);
         }
-        
-        console.log('[LOGIN] Tokens salvos no localStorage');
-        
-        setSuccess('Autenticação bem-sucedida! Redirecionando...');
+
+        setSuccess('Conta criada com sucesso! Redirecionando...');
         
         // Aguardar um pouco e depois redirecionar
         setTimeout(() => {
-          console.log('[LOGIN] Redirecionando para /...');
           // Recarregar a página para forçar atualização do useAuth
           window.location.href = '/';
-        }, 1200);
+        }, 800);
       } catch (err) {
-        console.error('[LOGIN] Erro ao verificar código:', err.response?.data);
-        setError(err.response?.data?.detail || 'Código inválido');
+        console.error('Verification error:', err.response?.data);
+        setError(getErrorMessage(err));
       } finally {
         setIsLoading(false);
       }
     }
-  };
-
-  const handleForgotPassword = () => {
-    alert('Password recovery feature coming soon...');
   };
 
   return (
@@ -123,9 +167,9 @@ export default function Login() {
           <div className="flex items-center mx-2">
             <span className="text-lg font-bold text-white tracking-widest font-['Space_Grotesk']">FRAME_ANALYSIS_CMD</span>
             <div className="h-4 w-[1px] bg-white/20 mx-2"></div>
-            <span className="font-label-caps text-[10px] text-cyan-400">STATUS: LOCKED</span>
+            <span className="font-label-caps text-[10px] text-cyan-400">STATUS: INITIALIZING</span>
             <div className="h-4 w-[1px] bg-white/20 mx-2"></div>
-            <span className="font-label-caps text-[10px] text-slate-500">PRE_AUTH_MODE</span>
+            <span className="font-label-caps text-[10px] text-slate-500">REGISTRATION_MODE</span>
           </div>
           <div className="flex items-center gap-2">
             <div className="relative group">
@@ -134,36 +178,29 @@ export default function Login() {
             </div>
             <span className="material-symbols-outlined text-slate-500 hover:text-cyan-400 cursor-pointer transition-colors">settings</span>
             <span className="material-symbols-outlined text-slate-500 hover:text-cyan-400 cursor-pointer transition-colors">terminal</span>
-            <div className="flex items-center pl-5 border-l border-white/10">
-              <button className="px-6 h-10 text-slate-950 font-label-caps text-[10px] font-bold tracking-widest rounded hover:opacity-90 transition-opacity" style={{
-                backgroundImage: 'linear-gradient(to right, #06b6d4, #a855f7)'
-              }}>
-                LOGIN / JOIN
-              </button>
-            </div>
           </div>
         </header>
 
         {/* PAGE CONTENT */}
-        <main className="fixed inset-0 top-16 overflow-y-auto relative z-10 flex items-center justify-center">
+        <main className="fixed inset-0 top-16 overflow-y-auto relative z-10 flex items-center justify-center py-8">
           {/* BACKGROUND AESTHETIC */}
           <div className="fixed inset-0 z-0 pointer-events-none">
             <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-cyan-900/20 blur-[120px] rounded-full"></div>
             <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-900/10 blur-[120px] rounded-full"></div>
           </div>
 
-          {/* Login Module */}
+          {/* SignUp Module */}
           <div className="relative z-10 w-full max-w-md mx-auto">
             <div className="glass-panel p-10 rounded-xl shadow-[0_0_50px_rgba(0,0,0,0.5)] border border-cyan-500/20">
               {/* Panel Header */}
               <div className="mb-10 text-center">
                 <div className="inline-block px-3 py-1 mb-4 border border-cyan-500/30 bg-cyan-500/5 rounded text-[10px] font-label-caps text-cyan-400 uppercase tracking-[0.3em]">
-                  {step === 'login' ? 'Authorization Required' : 'Verification Code'}
+                  {step === 'register' ? 'Create Account' : 'Verification Code'}
                 </div>
-                <h1 className="font-headline-lg text-primary-fixed mb-2 uppercase tracking-tighter">FPS_CORE</h1>
+                <h1 className="font-headline-lg text-primary-fixed mb-2 uppercase tracking-tighter">FPS_CORE_INIT</h1>
                 <p className="text-on-surface-variant text-sm font-body-md opacity-70">
-                  {step === 'login' 
-                    ? 'Initialize secure connection to global neural nodes.' 
+                  {step === 'register' 
+                    ? 'Initialize your neural node connection.' 
                     : 'Enter the verification code sent to your email.'}
                 </p>
               </div>
@@ -182,10 +219,29 @@ export default function Login() {
                 </div>
               )}
 
-              {/* Login Form */}
-              <form onSubmit={handleSubmit} className="space-y-8">
-                {step === 'login' ? (
+              {/* SignUp Form */}
+              <form onSubmit={handleSubmit} className="space-y-6">
+                {step === 'register' ? (
                   <>
+                    {/* Name Field */}
+                    <div className="relative">
+                      <label className="font-label-caps text-[10px] text-cyan-400/80 mb-2 block uppercase tracking-widest">
+                        Operator Name
+                      </label>
+                      <div className="flex items-center border-b border-cyan-500/30 focus-within:border-cyan-400 transition-colors bg-cyan-500/5 px-3 py-3">
+                        <span className="material-symbols-outlined text-cyan-400/60 mr-3">person</span>
+                        <input
+                          type="text"
+                          name="name"
+                          value={formData.name}
+                          onChange={handleChange}
+                          required
+                          className="bg-transparent border-none focus:ring-0 text-primary-fixed placeholder:text-cyan-900/50 w-full font-label-caps text-sm tracking-widest uppercase outline-none"
+                          placeholder="YOUR_NAME"
+                        />
+                      </div>
+                    </div>
+
                     {/* Email Field */}
                     <div className="relative">
                       <label className="font-label-caps text-[10px] text-cyan-400/80 mb-2 block uppercase tracking-widest">
@@ -230,6 +286,73 @@ export default function Login() {
                         </button>
                       </div>
                     </div>
+
+                    {/* Confirm Password Field */}
+                    <div className="relative">
+                      <label className="font-label-caps text-[10px] text-cyan-400/80 mb-2 block uppercase tracking-widest">
+                        Confirm Keyphrase
+                      </label>
+                      <div className="flex items-center border-b border-cyan-500/30 focus-within:border-cyan-400 transition-colors bg-cyan-500/5 px-3 py-3">
+                        <span className="material-symbols-outlined text-cyan-400/60 mr-3">verified</span>
+                        <input
+                          type={showConfirmPassword ? 'text' : 'password'}
+                          name="confirmPassword"
+                          value={formData.confirmPassword}
+                          onChange={handleChange}
+                          required
+                          className="bg-transparent border-none focus:ring-0 text-primary-fixed placeholder:text-cyan-900/50 w-full font-label-caps text-sm tracking-widest outline-none"
+                          placeholder="••••••••••••"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                          className="material-symbols-outlined text-cyan-400/40 cursor-pointer hover:text-cyan-400 transition-colors"
+                        >
+                          {showConfirmPassword ? 'visibility_off' : 'visibility'}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Hardware Info (Optional) */}
+                    <div className="border-t border-cyan-500/20 pt-6">
+                      <p className="text-[9px] text-slate-500 mb-4 uppercase tracking-widest">Optional: Current Hardware</p>
+                      
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="relative">
+                          <label className="font-label-caps text-[8px] text-cyan-400/60 mb-1 block uppercase tracking-widest">CPU</label>
+                          <input
+                            type="text"
+                            name="cpu"
+                            value={formData.cpu}
+                            onChange={handleChange}
+                            className="bg-cyan-500/5 border border-cyan-500/20 focus:border-cyan-400 rounded px-2 py-2 text-primary-fixed placeholder:text-cyan-900/30 w-full font-label-caps text-xs outline-none transition-colors"
+                            placeholder="CPU_MODEL"
+                          />
+                        </div>
+                        <div className="relative">
+                          <label className="font-label-caps text-[8px] text-cyan-400/60 mb-1 block uppercase tracking-widest">GPU</label>
+                          <input
+                            type="text"
+                            name="gpu"
+                            value={formData.gpu}
+                            onChange={handleChange}
+                            className="bg-cyan-500/5 border border-cyan-500/20 focus:border-cyan-400 rounded px-2 py-2 text-primary-fixed placeholder:text-cyan-900/30 w-full font-label-caps text-xs outline-none transition-colors"
+                            placeholder="GPU_MODEL"
+                          />
+                        </div>
+                        <div className="relative">
+                          <label className="font-label-caps text-[8px] text-cyan-400/60 mb-1 block uppercase tracking-widest">RAM</label>
+                          <input
+                            type="text"
+                            name="ram"
+                            value={formData.ram}
+                            onChange={handleChange}
+                            className="bg-cyan-500/5 border border-cyan-500/20 focus:border-cyan-400 rounded px-2 py-2 text-primary-fixed placeholder:text-cyan-900/30 w-full font-label-caps text-xs outline-none transition-colors col-span-2"
+                            placeholder="RAM_AMOUNT"
+                          />
+                        </div>
+                      </div>
+                    </div>
                   </>
                 ) : (
                   <>
@@ -250,7 +373,7 @@ export default function Login() {
                           placeholder="000000"
                         />
                       </div>
-                      <p className="text-[9px] text-slate-500 mt-2">Código enviado para: {formData.email}</p>
+                      <p className="text-[9px] text-slate-500 mt-2">Code sent to: {formData.email}</p>
                     </div>
                   </>
                 )}
@@ -286,8 +409,8 @@ export default function Login() {
                   >
                     {isLoading 
                       ? 'INITIALIZING...' 
-                      : step === 'login' 
-                        ? 'INITIATE NEURAL LINK' 
+                      : step === 'register' 
+                        ? 'CREATE ACCOUNT' 
                         : 'VERIFY CODE'}
                   </button>
                 </div>
@@ -297,30 +420,24 @@ export default function Login() {
                   <button
                     type="button"
                     onClick={() => {
-                      setStep('login');
+                      setStep('register');
                       setCode('');
                       setError('');
                       setSuccess('');
                     }}
                     className="w-full py-2 text-cyan-400 hover:text-cyan-300 font-label-caps text-[10px] uppercase transition-colors"
                   >
-                    ← Back to Login
+                    ← Back to Registration
                   </button>
                 )}
               </form>
 
               {/* Footer Links */}
-              <div className="mt-8 flex justify-between items-center text-[10px] font-label-caps tracking-widest">
-                <button
-                  onClick={handleForgotPassword}
-                  className="text-on-surface-variant hover:text-cyan-400 transition-colors uppercase bg-none border-none cursor-pointer"
-                >
-                  Forgot Credentials
-                </button>
-                <div className="h-px w-8 bg-cyan-500/20"></div>
+              <div className="mt-8 flex justify-center items-center text-[10px] font-label-caps tracking-widest">
+                <span className="text-on-surface-variant mr-2">Already have an account?</span>
                 <Link
-                  to="/signup"
-                  className="text-on-surface-variant hover:text-cyan-400 transition-colors uppercase underline decoration-cyan-500/40 underline-offset-4"
+                  to="/login"
+                  className="text-cyan-400 hover:text-cyan-300 transition-colors uppercase underline decoration-cyan-500/40 underline-offset-4"
                 >
                   Sign In
                 </Link>
@@ -333,53 +450,19 @@ export default function Login() {
                 <span className="text-[8px] font-label-caps text-slate-500 uppercase">Latency</span>
                 <span className="text-xs font-data-display text-cyan-400">--</span>
               </div>
-              <div className="flex flex-col text-center">
-                <span className="text-[8px] font-label-caps text-slate-500 uppercase">Server Status</span>
-                <span className="text-xs font-data-display text-slate-500">LOCKED</span>
+              <div className="h-8 w-[1px] bg-cyan-500/20"></div>
+              <div className="flex flex-col">
+                <span className="text-[8px] font-label-caps text-slate-500 uppercase">Bandwidth</span>
+                <span className="text-xs font-data-display text-cyan-400">--</span>
               </div>
-              <div className="flex flex-col text-right">
-                <span className="text-[8px] font-label-caps text-slate-500 uppercase">Node ID</span>
-                <span className="text-xs font-data-display text-slate-400">--</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Right Side HUD Element */}
-          <div className="absolute right-10 top-1/2 -translate-y-1/2 hidden xl:block w-48 space-y-4 opacity-40">
-            <div className="glass-panel p-4 border-l-2 border-l-cyan-400">
-              <div className="text-[9px] font-label-caps text-cyan-400/60 mb-1">SYSTEM LOAD</div>
-              <div className="h-1 bg-slate-800 rounded-full overflow-hidden">
-                <div className="h-full bg-cyan-400 w-0"></div>
-              </div>
-            </div>
-            <div className="glass-panel p-4 border-l-2 border-l-slate-600">
-              <div className="text-[9px] font-label-caps text-slate-500 mb-1">NETWORK STABILITY</div>
-              <div className="flex gap-1">
-                <div className="h-3 w-1 bg-slate-600"></div>
-                <div className="h-3 w-1 bg-slate-600"></div>
-                <div className="h-3 w-1 bg-slate-600"></div>
-                <div className="h-3 w-1 bg-slate-600"></div>
-                <div className="h-3 w-1 bg-slate-800"></div>
+              <div className="h-8 w-[1px] bg-cyan-500/20"></div>
+              <div className="flex flex-col">
+                <span className="text-[8px] font-label-caps text-slate-500 uppercase">Signal</span>
+                <span className="text-xs font-data-display text-cyan-400">█ █ █ █ █</span>
               </div>
             </div>
           </div>
         </main>
-
-        {/* BOTTOM STATUS BAR - Idêntica ao App.jsx mas desativada */}
-        <footer className="fixed bottom-0 right-0 left-64 h-8 bg-slate-900/80 backdrop-blur-sm border-t border-white/5 z-40 flex items-center justify-between px-8 opacity-40 pointer-events-none">
-          <div className="flex items-center gap-4 ml-2">
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-slate-600"></span>
-              <span className="font-label-caps text-[9px] text-slate-400">DATABASE_SYNC: LOCKED</span>
-            </div>
-            <span className="font-label-caps text-[9px] text-slate-600">|</span>
-            <span className="font-label-caps text-[9px] text-slate-400">LATENCY: --MS</span>
-          </div>
-          <div className="flex items-center gap-4 mr-2">
-            <span className="font-label-caps text-[9px] text-slate-400">ENCRYPTION: AES-256</span>
-            <span className="font-label-caps text-[9px] text-slate-500">USER: --</span>
-          </div>
-        </footer>
       </div>
     </div>
   );

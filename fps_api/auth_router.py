@@ -32,7 +32,7 @@ from fps_api.schemas import (
     UserResponse,
 )
 from sqlalchemy.orm import Session
-from model.text_func import get_embedding
+# from model.text_func import get_embedding  # Lazy import para evitar sentence_transformers no startup
 from sqlalchemy import text
 
 bcrypt_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -105,6 +105,9 @@ async def create_account(
     - Envia código OTP para verificação de email
     - Usuário fica inativo até verificação
     """
+    # Lazy import para evitar carregar sentence_transformers no startup
+    from model.text_func import get_embedding
+    
     # Verifica se email já existe
     existing_user = session.query(Users).filter(Users.email == user_data.email).first()
     if existing_user:
@@ -397,6 +400,7 @@ async def get_current_user(
 
     - Extrai user_id do token Bearer
     - Retorna dados do usuário (sem senha)
+    - Retorna informações de GPU, CPU e RAM através das relações
     """
     user = session.query(Users).filter(Users.id == user_id).first()
     if not user:
@@ -405,12 +409,18 @@ async def get_current_user(
             detail="Usuário não encontrado",
         )
 
+    # Buscar nome da GPU através da relação
+    gpu_name = user.gpu_rel.name if user.gpu_rel else None
+    
+    # Buscar nome da CPU através da relação
+    cpu_name = user.cpu_rel.name if user.cpu_rel else None
+
     return UserResponse(
         id=user.id,
         name=user.name,
         email=user.email,
-        gpu=user.gpu if user.gpu else None,
-        cpu=user.cpu if user.cpu else None,
+        gpu=gpu_name,
+        cpu=cpu_name,
         ram=user.ram if user.ram else None,
     )
 

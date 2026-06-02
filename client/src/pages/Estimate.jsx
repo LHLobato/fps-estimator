@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import DashboardGrid from '../components/DashboardGrid';
 import GlassCard from '../components/GlassCard';
-
-const API_BASE_URL = 'http://localhost:8000';
+import * as hardwareAPI from '../api/hardware';
+import * as llmAPI from '../api/llm';
 
 export default function Estimate() {
   // State para formulário
@@ -13,15 +13,33 @@ export default function Estimate() {
   const [selectedCPU, setSelectedCPU] = useState('');
   const [selectedRAM, setSelectedRAM] = useState('');
   const [gameSearch, setGameSearch] = useState('');
+  const [cpuSearch, setCpuSearch] = useState('');
+  const [gpuSearch, setGpuSearch] = useState('');
+  const [ramSearch, setRamSearch] = useState('');
 
   // State para dados carregados
   const [games, setGames] = useState([]);
   const [gpus, setGpus] = useState([]);
   const [cpus, setCpus] = useState([]);
   const [rams] = useState([
-    '64GB DDR5 6000MT/s',
-    '32GB DDR5 5200MT/s',
-    '16GB DDR4 3200MT/s',
+    '128GB DDR5',
+    '64GB DDR5',
+    '32GB DDR5',
+    '16GB DDR5',
+    '8GB DDR5',
+    '4GB DDR5',
+    '128GB DDR4',
+    '64GB DDR4',
+    '32GB DDR4',
+    '16GB DDR4',
+    '8GB DDR4',
+    '4GB DDR4',
+    '128GB DDR3',
+    '64GB DDR3',
+    '32GB DDR3',
+    '16GB DDR3',
+    '8GB DDR3',
+    '4GB DDR3',
   ]);
 
   // State para resultado
@@ -58,40 +76,91 @@ export default function Estimate() {
   useEffect(() => {
     const fetchHardwareData = async () => {
       try {
-        const [gamesRes, gpusRes, cpusRes] = await Promise.all([
-          fetch(`${API_BASE_URL}/hardware/games`),
-          fetch(`${API_BASE_URL}/hardware/gpus`),
-          fetch(`${API_BASE_URL}/hardware/cpus`),
+        const [gamesList, gpusList, cpusList] = await Promise.all([
+          hardwareAPI.get_games_list(),
+          hardwareAPI.get_gpus_list(),
+          hardwareAPI.get_cpus_list(),
         ]);
 
-        if (gamesRes.ok) {
-          const data = await gamesRes.json();
-          setGames(data.games || []);
-        }
-        if (gpusRes.ok) {
-          const data = await gpusRes.json();
-          setGpus(data.gpus || []);
-          if (data.gpus?.length) setSelectedGPU(data.gpus[0]);
-        }
-        if (cpusRes.ok) {
-          const data = await cpusRes.json();
-          setCpus(data.cpus || []);
-          if (data.cpus?.length) setSelectedCPU(data.cpus[0]);
-        }
+        console.log('Games response:', gamesList);
+        console.log('GPUs response:', gpusList);
+        console.log('CPUs response:', cpusList);
+
+        // Extrair nomes dos hardware
+        const gameNames = gamesList.games.map((g) => typeof g === 'string' ? g : g.name);
+        const gpuNames = Array.isArray(gpusList.gpus) ? gpusList.gpus.map((g) => (typeof g === 'string' ? g : g.name)) : [];
+        const cpuNames = Array.isArray(cpusList.cpus) ? cpusList.cpus.map((c) => (typeof c === 'string' ? c : c.name)) : [];
+
+        console.log('Parsed games:', gameNames);
+        console.log('Parsed GPUs:', gpuNames);
+        console.log('Parsed CPUs:', cpuNames);
+
+        setGames(gameNames);
+        setGpus(gpuNames);
+        setCpus(cpuNames);
+
+        if (gpuNames.length > 0) setSelectedGPU(gpuNames[0]);
+        if (cpuNames.length > 0) setSelectedCPU(cpuNames[0]);
+        setSelectedRAM(rams[0]);
       } catch (err) {
         setError('Erro ao carregar dados do hardware');
-        console.error(err);
+        console.error('Erro completo:', err);
       }
     };
 
     fetchHardwareData();
-    setSelectedRAM(rams[0]);
-  }, []);
+  }, [rams]);
+
+  // Função de filtro inteligente - prioriza matches no início
+  const intelligentFilter = (items, searchTerm, limit = 3) => {
+    if (!searchTerm) return items;
+    
+    const term = searchTerm.toLowerCase().trim();
+    
+    // Dividir em palavras para busca por palavra-chave
+    const searchWords = term.split(/\s+/);
+    
+    const scored = items.map((item) => {
+      const itemLower = item.toLowerCase();
+      let score = 0;
+      
+      // Score alto para matches no início
+      if (itemLower.startsWith(term)) {
+        score += 1000;
+      }
+      
+      // Score para cada palavra-chave encontrada
+      searchWords.forEach((word) => {
+        if (itemLower.startsWith(word)) {
+          score += 500; // Match no início de uma palavra
+        } else if (itemLower.includes(` ${word}`)) {
+          score += 250; // Match após espaço
+        } else if (itemLower.includes(word)) {
+          score += 100; // Match em qualquer lugar
+        }
+      });
+      
+      return { item, score };
+    });
+    
+    return scored
+      .filter(({ score }) => score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, limit)
+      .map(({ item }) => item);
+  };
 
   // Filtrar jogos por busca
-  const filteredGames = games.filter((game) =>
-    game.toLowerCase().includes(gameSearch.toLowerCase())
-  );
+  const filteredGames = intelligentFilter(games, gameSearch);
+
+  // Filtrar CPUs por busca
+  const filteredCpus = intelligentFilter(cpus, cpuSearch);
+
+  // Filtrar GPUs por busca
+  const filteredGpus = intelligentFilter(gpus, gpuSearch);
+
+  // Filtrar RAMs por busca
+  const filteredRams = intelligentFilter(rams, ramSearch);
 
   // Submeter formulário
   const handleEstimate = async (e) => {
@@ -107,27 +176,17 @@ export default function Estimate() {
     setResult(null);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/estimate/ask_llm`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          gamename: selectedGame,
-          preset: selectedPreset,
-          resolution: selectedResolution,
-          upscaling: 'DLSS',
-          gpu: selectedGPU,
-          cpu: selectedCPU,
-          ram: selectedRAM,
-        }),
-      });
+      const estimateData = {
+        gamename: selectedGame,
+        preset: selectedPreset,
+        resolution: selectedResolution,
+        upscaling: 'DLSS',
+        gpu: selectedGPU,
+        cpu: selectedCPU,
+        ram: selectedRAM,
+      };
 
-      if (!response.ok) {
-        throw new Error('Erro ao estimar FPS');
-      }
-
-      const data = await response.json();
+      const data = await llmAPI.estimate_fps(estimateData);
       setResult(data);
 
       // Adicionar ao histórico
@@ -207,18 +266,14 @@ export default function Estimate() {
                 <label className="block font-label-caps text-[12px] text-cyan-500 mb-2">
                   TARGET_GAME_IDENTIFIER
                 </label>
-                <div className="relative flex items-center">
-                  <span className="absolute right-0 top-1/2 -translate-y-1/2 material-symbols-outlined text-slate-500 text-lg">
-                    search
-                  </span>
+                <div className="relative">
                   <input
                     type="text"
                     placeholder="e.g., Cyberpunk 2077, Elden Ring..."
                     value={gameSearch}
                     onChange={(e) => setGameSearch(e.target.value)}
-                    className="w-full bg-transparent border-b border-white/20 focus:border-cyan-400 py-3 pl-8 text-white font-body-md outline-none transition-all placeholder:text-slate-600"
+                    className="w-full bg-transparent border-b border-white/20 focus:border-cyan-400 py-3 text-white font-body-md outline-none transition-all placeholder:text-slate-600"
                   />
-
                   {/* Dropdown de jogos */}
                   {gameSearch && filteredGames.length > 0 && (
                     <div className="absolute top-full left-0 right-0 bg-slate-900 border border-cyan-500/40 rounded mt-2 max-h-64 overflow-y-auto z-50">
@@ -228,9 +283,9 @@ export default function Estimate() {
                           type="button"
                           onClick={() => {
                             setSelectedGame(game);
-                            setGameSearch(game);
+                            setGameSearch('');
                           }}
-                          className="w-full px-4 py-2 text-left text-white hover:bg-cyan-500/20 transition-colors text-sm"
+                          className="w-full px-4 py-2 text-left text-cyan-300 hover:bg-cyan-500/30 hover:text-cyan-100 transition-colors text-sm"
                         >
                           {game}
                         </button>
@@ -294,18 +349,36 @@ export default function Estimate() {
                 <label className="block font-label-caps text-[12px] text-cyan-500 mb-2">
                   PROCESSOR_UNIT (CPU)
                 </label>
-                <select
-                  value={selectedCPU}
-                  onChange={(e) => setSelectedCPU(e.target.value)}
-                  className="w-full bg-slate-900/50 border-b border-white/20 focus:border-cyan-400 py-3 text-white font-body-md outline-none transition-all appearance-none"
-                >
-                  <option value="">Selecione uma CPU</option>
-                  {cpus.map((cpu) => (
-                    <option key={cpu} value={cpu}>
-                      {cpu}
-                    </option>
-                  ))}
-                </select>
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Buscar CPU..."
+                    value={cpuSearch}
+                    onChange={(e) => setCpuSearch(e.target.value)}
+                    className="w-full bg-transparent border-b border-white/20 focus:border-cyan-400 py-3 px-0 text-white font-body-md outline-none transition-all placeholder:text-slate-600"
+                  />
+                  {/* Dropdown de CPUs */}
+                  {cpuSearch && filteredCpus.length > 0 && (
+                    <div className="absolute top-full left-0 right-0 bg-slate-900 border border-cyan-500/40 rounded mt-2 max-h-48 overflow-y-auto z-50">
+                      {filteredCpus.map((cpu) => (
+                        <button
+                          key={cpu}
+                          type="button"
+                          onClick={() => {
+                            setSelectedCPU(cpu);
+                            setCpuSearch('');
+                          }}
+                          className="w-full px-4 py-2 text-left text-cyan-300 hover:bg-cyan-500/30 hover:text-cyan-100 transition-colors text-sm"
+                        >
+                          {cpu}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                {selectedCPU && (
+                  <p className="text-xs text-cyan-400 mt-2">Selecionado: {selectedCPU}</p>
+                )}
               </div>
 
               {/* Graphics */}
@@ -313,18 +386,36 @@ export default function Estimate() {
                 <label className="block font-label-caps text-[12px] text-cyan-500 mb-2">
                   GRAPHICS_UNIT (GPU)
                 </label>
-                <select
-                  value={selectedGPU}
-                  onChange={(e) => setSelectedGPU(e.target.value)}
-                  className="w-full bg-slate-900/50 border-b border-white/20 focus:border-cyan-400 py-3 text-white font-body-md outline-none transition-all appearance-none"
-                >
-                  <option value="">Selecione uma GPU</option>
-                  {gpus.map((gpu) => (
-                    <option key={gpu} value={gpu}>
-                      {gpu}
-                    </option>
-                  ))}
-                </select>
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Buscar GPU..."
+                    value={gpuSearch}
+                    onChange={(e) => setGpuSearch(e.target.value)}
+                    className="w-full bg-transparent border-b border-white/20 focus:border-cyan-400 py-3 px-0 text-white font-body-md outline-none transition-all placeholder:text-slate-600"
+                  />
+                  {/* Dropdown de GPUs */}
+                  {gpuSearch && filteredGpus.length > 0 && (
+                    <div className="absolute top-full left-0 right-0 bg-slate-900 border border-cyan-500/40 rounded mt-2 max-h-48 overflow-y-auto z-50">
+                      {filteredGpus.map((gpu) => (
+                        <button
+                          key={gpu}
+                          type="button"
+                          onClick={() => {
+                            setSelectedGPU(gpu);
+                            setGpuSearch('');
+                          }}
+                          className="w-full px-4 py-2 text-left text-cyan-300 hover:bg-cyan-500/30 hover:text-cyan-100 transition-colors text-sm"
+                        >
+                          {gpu}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                {selectedGPU && (
+                  <p className="text-xs text-cyan-400 mt-2">Selecionado: {selectedGPU}</p>
+                )}
               </div>
 
               {/* Memory */}
@@ -332,18 +423,36 @@ export default function Estimate() {
                 <label className="block font-label-caps text-[12px] text-cyan-500 mb-2">
                   SYSTEM_MEMORY (RAM)
                 </label>
-                <select
-                  value={selectedRAM}
-                  onChange={(e) => setSelectedRAM(e.target.value)}
-                  className="w-full bg-slate-900/50 border-b border-white/20 focus:border-cyan-400 py-3 text-white font-body-md outline-none transition-all appearance-none"
-                >
-                  <option value="">Selecione a RAM</option>
-                  {rams.map((ram) => (
-                    <option key={ram} value={ram}>
-                      {ram}
-                    </option>
-                  ))}
-                </select>
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Buscar RAM..."
+                    value={ramSearch}
+                    onChange={(e) => setRamSearch(e.target.value)}
+                    className="w-full bg-transparent border-b border-white/20 focus:border-cyan-400 py-3 px-0 text-white font-body-md outline-none transition-all placeholder:text-slate-600"
+                  />
+                  {/* Dropdown de RAMs */}
+                  {ramSearch && filteredRams.length > 0 && (
+                    <div className="absolute top-full left-0 right-0 bg-slate-900 border border-cyan-500/40 rounded mt-2 max-h-48 overflow-y-auto z-50">
+                      {filteredRams.map((ram) => (
+                        <button
+                          key={ram}
+                          type="button"
+                          onClick={() => {
+                            setSelectedRAM(ram);
+                            setRamSearch('');
+                          }}
+                          className="w-full px-4 py-2 text-left text-cyan-300 hover:bg-cyan-500/30 hover:text-cyan-100 transition-colors text-sm"
+                        >
+                          {ram}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                {selectedRAM && (
+                  <p className="text-xs text-cyan-400 mt-2">Selecionado: {selectedRAM}</p>
+                )}
               </div>
 
               {/* Error Message */}

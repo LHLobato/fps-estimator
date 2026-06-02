@@ -6,8 +6,11 @@ Centraliza todas as configurações relacionadas a auth para facilitar manutenç
 import os
 from datetime import timedelta
 from dotenv import load_dotenv
+from pathlib import Path
 
-load_dotenv()
+# Carrega .env do diretório fps_api
+env_path = Path(__file__).parent / ".env"
+load_dotenv(dotenv_path=env_path)
 
 # ========================
 # JWT Configuration

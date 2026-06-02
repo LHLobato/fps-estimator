@@ -1,108 +1,50 @@
-import api from "./config";
+import axios, { AxiosInstance } from "axios";
 
-export interface UserCreateSchema {
-  email: string;
-  password: string;
-  name?: string;
-  profile_photo?: string;
-  gpu?: string;
-  cpu?: string;
-  ram?: string;
-}
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
-export interface LoginSchema {
-  email: string;
-  password: string;
-}
+const api: AxiosInstance = axios.create({
+  baseURL: API_BASE_URL,
+  headers: {
+    "Content-Type": "application/json",
+  },
+});
 
-export interface CodeSchema {
-  email: string;
-  code: string;
-}
+// Interceptador para adicionar token JWT aos headers
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem("access_token");
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+      console.log('[API] Token adicionado ao request:', { url: config.url, token: token.slice(0, 20) + '...' });
+    } else {
+      console.log('[API] Nenhum token disponível para:', config.url);
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
 
-export interface DefaultResponse {
-  status: string;
-  message: string;
-}
+// Interceptador para lidar com respostas
+api.interceptors.response.use(
+  (response) => {
+    return response;
+  },
+  (error) => {
+    // Se receber 401, limpar token e redirecionar para login
+    if (error.response?.status === 401) {
+      localStorage.removeItem("access_token");
+      localStorage.removeItem("refresh_token");
+      // Aqui você pode redirecionar para a página de login
+      // window.location.href = "/login";
+    }
+    return Promise.reject(error);
+  }
+);
 
-export interface SignupResponse extends DefaultResponse {
-  user_id: string;
-}
-
-export interface AuthResponse {
-  access_token: string;
-  refresh_token?: string;
-  token_type: string;
-  user_id?: string;
-  message?: string;
-}
-
-export interface RefreshTokenRequest {
-  refresh_token: string;
-}
-
-export interface UserBase {
-  email: string;
-  name?: string;
-}
-
-export interface VerifyRecoveryResponse {
-  reset_token: string;
-}
-
-export interface PasswordResetSchema {
-  new_password: string;
-  reset_token: string;
-}
-
-export interface UserResponse {
-  id: string;
-  email: string;
-  name?: string;
-  profile_photo?: string;
-  gpu_id?: string;
-  cpu_id?: string;
-  ram?: string;
-}
-
-export async function sign_in(
-  userData: UserCreateSchema,
-): Promise<SignupResponse> {
-  const response = await api.post<SignupResponse>("/auth/sign_in", userData);
-  return response.data;
-}
-
-export async function verify_code_sign(
-  userData: CodeSchema,
-): Promise<AuthResponse> {
-  const response = await api.post<AuthResponse>(
-    "/auth/verify_code_sig",
-    userData,
-  );
-  return response.data;
-}
-
-export async function login(userData: LoginSchema): Promise<DefaultResponse> {
-  const response = await api.post<DefaultResponse>("/auth/login", userData);
-  return response.data;
-}
-
-export async function verify_code_login(
-  userData: CodeSchema,
-): Promise<AuthResponse> {
-  const response = await api.post<AuthResponse>(
-    "/auth/verify_code_log",
-    userData,
-  );
-  return response.data;
-}
-
-export async function refresh_token(
-  data: RefreshTokenRequest,
-): Promise<AuthResponse> {
-  const response = await api.post<AuthResponse>("/auth/refresh_token", data);
-  return response.data;
-}
+export default api;
+export { API_BASE_URL };
 
 export async function get_me(): Promise<UserResponse> {
   const response = await api.get<UserResponse>("/auth/me");

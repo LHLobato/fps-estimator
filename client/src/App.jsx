@@ -1,19 +1,29 @@
-import { Routes, Route, Link, useLocation } from 'react-router-dom';
+import { Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
 import Home from './pages/Home';
 import Estimate from './pages/Estimate';
 import User from './pages/User';
 import Compare from './pages/Compare';
 import Login from './pages/Login';
+import SignUp from './pages/SignUp';
+import { ProtectedRoute } from './components/ProtectedRoute';
+import { useAuth } from './hooks/useAuth';
 import './App.css';
 
 function AppLayout() {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
 
   const navItems = [
     { path: '/', label: 'Estimator', icon: 'speed' },
     { path: '/compare', label: 'Comparison', icon: 'compare_arrows' },
     { path: '/user', label: 'Profile', icon: 'fingerprint' },
   ];
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
 
   return (
     <div className="flex h-screen bg-slate-950">
@@ -56,13 +66,15 @@ function AppLayout() {
       {/* MAIN CONTENT */}
       <div className="flex-1 flex flex-col ml-64">
         {/* TOP APP BAR */}
-        <header className="fixed top-0 right-0 left-64 h-16 flex justify-between items-center px-2 bg-slate-950/60 backdrop-blur-md border-b border-cyan-500/20 shadow-2xl shadow-cyan-900/20 z-40">
+        <header className="sticky top-0 h-16 flex justify-between items-center px-2 bg-slate-950/60 backdrop-blur-md border-b border-cyan-500/20 shadow-2xl shadow-cyan-900/20 z-40">
           <div className="flex items-center mx-2">
             <span className="text-lg font-bold text-white tracking-widest font-['Space_Grotesk']">FRAME_ANALYSIS_CMD</span>
             <div className="h-4 w-[1px] bg-white/20 mx-2"></div>
             <span className="font-label-caps text-[10px] text-cyan-400">STATUS: CALIBRATED</span>
             <div className="h-4 w-[1px] bg-white/20 mx-2"></div>
-            <span className="font-label-caps text-[10px] text-secondary animate-pulse">GUEST_ACCESS_MODE</span>
+            <span className="font-label-caps text-[10px] text-secondary animate-pulse">
+              {user?.name ? `USER: ${user.name.toUpperCase()}` : 'GUEST_ACCESS_MODE'}
+            </span>
           </div>
           <div className="flex items-center gap-2">
             <div className="relative group">
@@ -72,34 +84,37 @@ function AppLayout() {
             <span className="material-symbols-outlined text-slate-500 hover:text-cyan-400 cursor-pointer transition-colors">settings</span>
             <span className="material-symbols-outlined text-slate-500 hover:text-cyan-400 cursor-pointer transition-colors">terminal</span>
             <div className="flex items-center pl-5 border-l border-white/10">
-              <button className="px-6 h-10 bg-gradient-to-r from-cyan-400 to-secondary text-slate-950 font-label-caps text-[10px] font-bold tracking-widest rounded hover:opacity-90 transition-opacity">
-                LOGIN / JOIN
+              <button 
+                onClick={handleLogout}
+                className="px-6 h-10 bg-gradient-to-r from-cyan-400 to-secondary text-slate-950 font-label-caps text-[10px] font-bold tracking-widest rounded hover:opacity-90 transition-opacity"
+              >
+                LOGOUT
               </button>
             </div>
           </div>
         </header>
 
         {/* PAGE CONTENT */}
-        <main className="fixed inset-0 top-16 overflow-y-auto relative z-10">
+        <main className="flex-1 overflow-y-auto relative z-10">
           {/* BACKGROUND AESTHETIC */}
-          <div className="fixed inset-0 z-0 pointer-events-none">
+          <div className="fixed inset-0 z-0 pointer-events-none ml-64">
             <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-cyan-900/20 blur-[120px] rounded-full"></div>
             <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-900/10 blur-[120px] rounded-full"></div>
           </div>
 
           {/* Container do conteúdo */}
-          <div className="relative z-10 max-w-7xl mx-auto px-10 py-10 pb-16">
+          <div className="relative z-10 max-w-7xl mx-auto px-10 py-10 pb-20">
             <Routes>
-              <Route path="/" element={<Estimate />} />
-              <Route path="/analytics" element={<Home />} />
-              <Route path="/compare" element={<Compare />} />
-              <Route path="/user" element={<User />} />
+              <Route path="/" element={<ProtectedRoute><Estimate /></ProtectedRoute>} />
+              <Route path="/analytics" element={<ProtectedRoute><Home /></ProtectedRoute>} />
+              <Route path="/compare" element={<ProtectedRoute><Compare /></ProtectedRoute>} />
+              <Route path="/user" element={<ProtectedRoute><User /></ProtectedRoute>} />
             </Routes>
           </div>
         </main>
 
         {/* BOTTOM STATUS BAR — padding lateral aumentado */}
-        <footer className="fixed bottom-0 right-0 left-64 h-8 bg-slate-900/80 backdrop-blur-sm border-t border-white/5 z-40 flex items-center justify-between px-8">
+        <footer className="sticky bottom-0 h-8 bg-slate-900/80 backdrop-blur-sm border-t border-white/5 z-40 flex items-center justify-between px-8">
           <div className="flex items-center gap-4 ml-2">
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-cyan-500 animate-pulse"></span>
@@ -120,13 +135,33 @@ function AppLayout() {
 
 function App() {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { isAuthenticated, loading } = useAuth();
 
-  // Se estiver na página de login, mostrar sem layout
-  if (location.pathname === '/login') {
-    return <Login />;
+  // Se ainda está carregando, mostrar loading
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-slate-950">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-4 border-cyan-400 border-t-transparent mx-auto mb-4"></div>
+          <p className="text-cyan-400 font-label-caps">INITIALIZING...</p>
+        </div>
+      </div>
+    );
   }
 
-  // Caso contrário, mostrar com layout
+  // Se estiver em /login ou /signup e JÁ está autenticado, redirecionar para /
+  if ((location.pathname === '/login' || location.pathname === '/signup') && isAuthenticated) {
+    navigate('/', { replace: true });
+    return null;
+  }
+
+  // Se estiver em /login ou /signup e NÃO está autenticado, mostrar sem layout
+  if (location.pathname === '/login' || location.pathname === '/signup') {
+    return location.pathname === '/login' ? <Login /> : <SignUp />;
+  }
+
+  // Caso contrário, mostrar com layout (AppLayout faz a verificação de autenticação)
   return <AppLayout />;
 }
 

@@ -11,7 +11,7 @@ from fps_api.schemas import (
 )
 from sqlalchemy.orm import Session
 from fps_api.build_db import Users, Game, GameUser
-from model.text_func import retrieval_game_info
+# from model.text_func import retrieval_game_info  # Lazy import
 
 game_router = APIRouter(prefix="/games", tags=["games, analysis"])
 
@@ -123,10 +123,12 @@ async def get_game_info(
     Raises:
         HTTPException: 404 se jogo não encontrado
     """
+    # Lazy import para evitar sentence_transformers no startup
+    from model.text_func import retrieval_game_info
+    
     game_info = await retrieval_game_info(game_identifier, session)
 
     return GameInfoResponseSchema(
         status="ok",
         game=GameInfoSchema(**game_info)
     )
-    }

@@ -84,7 +84,7 @@ class Users(Base):
     profile_photo = Column(String, nullable=True)
     gpu_id        = Column(UUID(as_uuid=True), ForeignKey("gpus.id"), nullable=True)
     cpu_id        = Column(UUID(as_uuid=True), ForeignKey("cpus.id"), nullable=True)
-    ram           = Column(String)
+    ram           = Column(String, nullable=True)
     password      = Column(String)
     otp_secret    = Column(String)
     ativo         = Column(Boolean, default=False)
