@@ -1,9 +1,17 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import * as authAPI from '../api/auth';
+import { HardwareSearchInput } from '../components/HardwareSearchInput';
+import { useCpuSearch, useGpuSearch } from '../hooks/useHardwareSearch';
+import { filterRamOptions } from '../utils/filterRam';
+
+const RAM_OPTIONS = [
+  '128GB DDR5', '64GB DDR5', '32GB DDR5', '16GB DDR5', '8GB DDR5', '4GB DDR5',
+  '128GB DDR4', '64GB DDR4', '32GB DDR4', '16GB DDR4', '8GB DDR4', '4GB DDR4',
+  '128GB DDR3', '64GB DDR3', '32GB DDR3', '16GB DDR3', '8GB DDR3', '4GB DDR3',
+];
 
 export default function SignUp() {
-  const navigate = useNavigate();
   const [step, setStep] = useState('register'); // 'register' ou 'verify_code'
   const [formData, setFormData] = useState({
     email: '',
@@ -20,6 +28,14 @@ export default function SignUp() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+
+  const [cpuSearch, setCpuSearch] = useState('');
+  const [gpuSearch, setGpuSearch] = useState('');
+  const [ramSearch, setRamSearch] = useState('');
+
+  const { results: cpuSearchResults, loading: cpuSearchLoading } = useCpuSearch(cpuSearch, 10);
+  const { results: gpuSearchResults, loading: gpuSearchLoading } = useGpuSearch(gpuSearch, 10);
+  const filteredRams = filterRamOptions(RAM_OPTIONS, ramSearch, 10);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -178,11 +194,20 @@ export default function SignUp() {
             </div>
             <span className="material-symbols-outlined text-slate-500 hover:text-cyan-400 cursor-pointer transition-colors">settings</span>
             <span className="material-symbols-outlined text-slate-500 hover:text-cyan-400 cursor-pointer transition-colors">terminal</span>
+            <div className="flex items-center pl-5 border-l border-white/10">
+              <Link
+                to="/login"
+                className="px-6 h-10 text-slate-950 font-label-caps text-[10px] font-bold tracking-widest rounded hover:opacity-90 transition-opacity inline-flex items-center"
+                style={{ backgroundImage: 'linear-gradient(to right, #06b6d4, #a855f7)' }}
+              >
+                LOGIN / JOIN
+              </Link>
+            </div>
           </div>
         </header>
 
         {/* PAGE CONTENT */}
-        <main className="fixed inset-0 top-16 overflow-y-auto relative z-10 flex items-center justify-center py-8">
+        <main className="fixed inset-0 top-16 overflow-y-auto relative z-10 flex items-center justify-center">
           {/* BACKGROUND AESTHETIC */}
           <div className="fixed inset-0 z-0 pointer-events-none">
             <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-cyan-900/20 blur-[120px] rounded-full"></div>
@@ -197,7 +222,7 @@ export default function SignUp() {
                 <div className="inline-block px-3 py-1 mb-4 border border-cyan-500/30 bg-cyan-500/5 rounded text-[10px] font-label-caps text-cyan-400 uppercase tracking-[0.3em]">
                   {step === 'register' ? 'Create Account' : 'Verification Code'}
                 </div>
-                <h1 className="font-headline-lg text-primary-fixed mb-2 uppercase tracking-tighter">FPS_CORE_INIT</h1>
+                <h1 className="font-headline-lg text-primary-fixed mb-2 uppercase tracking-tighter">FPS_CORE</h1>
                 <p className="text-on-surface-variant text-sm font-body-md opacity-70">
                   {step === 'register' 
                     ? 'Initialize your neural node connection.' 
@@ -314,43 +339,68 @@ export default function SignUp() {
                     </div>
 
                     {/* Hardware Info (Optional) */}
-                    <div className="border-t border-cyan-500/20 pt-6">
-                      <p className="text-[9px] text-slate-500 mb-4 uppercase tracking-widest">Optional: Current Hardware</p>
-                      
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="relative">
-                          <label className="font-label-caps text-[8px] text-cyan-400/60 mb-1 block uppercase tracking-widest">CPU</label>
-                          <input
-                            type="text"
-                            name="cpu"
-                            value={formData.cpu}
-                            onChange={handleChange}
-                            className="bg-cyan-500/5 border border-cyan-500/20 focus:border-cyan-400 rounded px-2 py-2 text-primary-fixed placeholder:text-cyan-900/30 w-full font-label-caps text-xs outline-none transition-colors"
-                            placeholder="CPU_MODEL"
-                          />
-                        </div>
-                        <div className="relative">
-                          <label className="font-label-caps text-[8px] text-cyan-400/60 mb-1 block uppercase tracking-widest">GPU</label>
-                          <input
-                            type="text"
-                            name="gpu"
-                            value={formData.gpu}
-                            onChange={handleChange}
-                            className="bg-cyan-500/5 border border-cyan-500/20 focus:border-cyan-400 rounded px-2 py-2 text-primary-fixed placeholder:text-cyan-900/30 w-full font-label-caps text-xs outline-none transition-colors"
-                            placeholder="GPU_MODEL"
-                          />
-                        </div>
-                        <div className="relative">
-                          <label className="font-label-caps text-[8px] text-cyan-400/60 mb-1 block uppercase tracking-widest">RAM</label>
-                          <input
-                            type="text"
-                            name="ram"
-                            value={formData.ram}
-                            onChange={handleChange}
-                            className="bg-cyan-500/5 border border-cyan-500/20 focus:border-cyan-400 rounded px-2 py-2 text-primary-fixed placeholder:text-cyan-900/30 w-full font-label-caps text-xs outline-none transition-colors col-span-2"
-                            placeholder="RAM_AMOUNT"
-                          />
-                        </div>
+                    <div className="border-t border-cyan-500/20 pt-6 space-y-4">
+                      <p className="text-[9px] text-slate-500 uppercase tracking-widest">Optional: Current Hardware</p>
+
+                      <HardwareSearchInput
+                        label="Processor Unit (CPU)"
+                        placeholder="Buscar CPU..."
+                        search={cpuSearch}
+                        onSearchChange={setCpuSearch}
+                        results={cpuSearchResults}
+                        loading={cpuSearchLoading}
+                        selected={formData.cpu}
+                        onSelect={(name) => {
+                          setFormData((prev) => ({ ...prev, cpu: name }));
+                          setCpuSearch('');
+                        }}
+                      />
+
+                      <HardwareSearchInput
+                        label="Graphics Unit (GPU)"
+                        placeholder="Buscar GPU..."
+                        search={gpuSearch}
+                        onSearchChange={setGpuSearch}
+                        results={gpuSearchResults}
+                        loading={gpuSearchLoading}
+                        selected={formData.gpu}
+                        onSelect={(name) => {
+                          setFormData((prev) => ({ ...prev, gpu: name }));
+                          setGpuSearch('');
+                        }}
+                      />
+
+                      <div className="relative">
+                        <label className="font-label-caps text-[10px] text-cyan-400/80 mb-2 block uppercase tracking-widest">
+                          System Memory (RAM)
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Buscar RAM..."
+                          value={ramSearch}
+                          onChange={(e) => setRamSearch(e.target.value)}
+                          className="w-full bg-transparent border-b border-cyan-500/30 focus:border-cyan-400 py-2 text-primary-fixed font-label-caps text-sm outline-none transition-all placeholder:text-cyan-900/50"
+                        />
+                        {ramSearch && filteredRams.length > 0 && (
+                          <div className="absolute top-full left-0 right-0 bg-slate-900 border border-cyan-500/40 rounded mt-2 max-h-48 overflow-y-auto z-50">
+                            {filteredRams.map((ram) => (
+                              <button
+                                key={ram}
+                                type="button"
+                                onClick={() => {
+                                  setFormData((prev) => ({ ...prev, ram }));
+                                  setRamSearch('');
+                                }}
+                                className="w-full px-4 py-2 text-left text-cyan-300 hover:bg-cyan-500/30 hover:text-cyan-100 transition-colors text-sm"
+                              >
+                                {ram}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                        {formData.ram && (
+                          <p className="text-[9px] text-cyan-400 mt-2">Selecionado: {formData.ram}</p>
+                        )}
                       </div>
                     </div>
                   </>
@@ -450,19 +500,53 @@ export default function SignUp() {
                 <span className="text-[8px] font-label-caps text-slate-500 uppercase">Latency</span>
                 <span className="text-xs font-data-display text-cyan-400">--</span>
               </div>
-              <div className="h-8 w-[1px] bg-cyan-500/20"></div>
-              <div className="flex flex-col">
-                <span className="text-[8px] font-label-caps text-slate-500 uppercase">Bandwidth</span>
-                <span className="text-xs font-data-display text-cyan-400">--</span>
+              <div className="flex flex-col text-center">
+                <span className="text-[8px] font-label-caps text-slate-500 uppercase">Server Status</span>
+                <span className="text-xs font-data-display text-slate-500">INITIALIZING</span>
               </div>
-              <div className="h-8 w-[1px] bg-cyan-500/20"></div>
-              <div className="flex flex-col">
-                <span className="text-[8px] font-label-caps text-slate-500 uppercase">Signal</span>
-                <span className="text-xs font-data-display text-cyan-400">█ █ █ █ █</span>
+              <div className="flex flex-col text-right">
+                <span className="text-[8px] font-label-caps text-slate-500 uppercase">Node ID</span>
+                <span className="text-xs font-data-display text-slate-400">--</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Side HUD Element */}
+          <div className="absolute right-10 top-1/2 -translate-y-1/2 hidden xl:block w-48 space-y-4 opacity-40">
+            <div className="glass-panel p-4 border-l-2 border-l-cyan-400">
+              <div className="text-[9px] font-label-caps text-cyan-400/60 mb-1">SYSTEM LOAD</div>
+              <div className="h-1 bg-slate-800 rounded-full overflow-hidden">
+                <div className="h-full bg-cyan-400 w-1/4"></div>
+              </div>
+            </div>
+            <div className="glass-panel p-4 border-l-2 border-l-slate-600">
+              <div className="text-[9px] font-label-caps text-slate-500 mb-1">NETWORK STABILITY</div>
+              <div className="flex gap-1">
+                <div className="h-3 w-1 bg-cyan-400"></div>
+                <div className="h-3 w-1 bg-cyan-400"></div>
+                <div className="h-3 w-1 bg-cyan-400"></div>
+                <div className="h-3 w-1 bg-slate-600"></div>
+                <div className="h-3 w-1 bg-slate-800"></div>
               </div>
             </div>
           </div>
         </main>
+
+        {/* BOTTOM STATUS BAR */}
+        <footer className="fixed bottom-0 right-0 left-64 h-8 bg-slate-900/80 backdrop-blur-sm border-t border-white/5 z-40 flex items-center justify-between px-8 opacity-40 pointer-events-none">
+          <div className="flex items-center gap-4 ml-2">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-cyan-500 animate-pulse"></span>
+              <span className="font-label-caps text-[9px] text-slate-400">DATABASE_SYNC: PENDING</span>
+            </div>
+            <span className="font-label-caps text-[9px] text-slate-600">|</span>
+            <span className="font-label-caps text-[9px] text-slate-400">LATENCY: --MS</span>
+          </div>
+          <div className="flex items-center gap-4 mr-2">
+            <span className="font-label-caps text-[9px] text-slate-400">ENCRYPTION: AES-256</span>
+            <span className="font-label-caps text-[9px] text-slate-500">USER: GUEST</span>
+          </div>
+        </footer>
       </div>
     </div>
   );

@@ -34,7 +34,8 @@ class UserAlter(UserBase):
     profile_photo: Optional[str]
 
 
-class UserAlterSetup(UserBase):
+class UserAlterSetup(BaseModel):
+    """Atualização apenas de hardware — não exige email/nome."""
     gpu: Optional[str] = None
     cpu: Optional[str] = None
     ram: Optional[str] = None

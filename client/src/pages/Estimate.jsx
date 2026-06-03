@@ -1,8 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import DashboardGrid from '../components/DashboardGrid';
 import GlassCard from '../components/GlassCard';
-import * as hardwareAPI from '../api/hardware';
+import { HardwareSearchInput } from '../components/HardwareSearchInput';
 import * as llmAPI from '../api/llm';
+import { useGameSearch } from '../hooks/useGameSearch';
+import { useCpuSearch, useGpuSearch } from '../hooks/useHardwareSearch';
+import { filterRamOptions } from '../utils/filterRam';
 
 export default function Estimate() {
   // State para formulário
@@ -17,10 +20,6 @@ export default function Estimate() {
   const [gpuSearch, setGpuSearch] = useState('');
   const [ramSearch, setRamSearch] = useState('');
 
-  // State para dados carregados
-  const [games, setGames] = useState([]);
-  const [gpus, setGpus] = useState([]);
-  const [cpus, setCpus] = useState([]);
   const [rams] = useState([
     '128GB DDR5',
     '64GB DDR5',
@@ -72,95 +71,10 @@ export default function Estimate() {
     },
   ]);
 
-  // Fetch dados iniciais
-  useEffect(() => {
-    const fetchHardwareData = async () => {
-      try {
-        const [gamesList, gpusList, cpusList] = await Promise.all([
-          hardwareAPI.get_games_list(),
-          hardwareAPI.get_gpus_list(),
-          hardwareAPI.get_cpus_list(),
-        ]);
-
-        console.log('Games response:', gamesList);
-        console.log('GPUs response:', gpusList);
-        console.log('CPUs response:', cpusList);
-
-        // Extrair nomes dos hardware
-        const gameNames = gamesList.games.map((g) => typeof g === 'string' ? g : g.name);
-        const gpuNames = Array.isArray(gpusList.gpus) ? gpusList.gpus.map((g) => (typeof g === 'string' ? g : g.name)) : [];
-        const cpuNames = Array.isArray(cpusList.cpus) ? cpusList.cpus.map((c) => (typeof c === 'string' ? c : c.name)) : [];
-
-        console.log('Parsed games:', gameNames);
-        console.log('Parsed GPUs:', gpuNames);
-        console.log('Parsed CPUs:', cpuNames);
-
-        setGames(gameNames);
-        setGpus(gpuNames);
-        setCpus(cpuNames);
-
-        if (gpuNames.length > 0) setSelectedGPU(gpuNames[0]);
-        if (cpuNames.length > 0) setSelectedCPU(cpuNames[0]);
-        setSelectedRAM(rams[0]);
-      } catch (err) {
-        setError('Erro ao carregar dados do hardware');
-        console.error('Erro completo:', err);
-      }
-    };
-
-    fetchHardwareData();
-  }, [rams]);
-
-  // Função de filtro inteligente - prioriza matches no início
-  const intelligentFilter = (items, searchTerm, limit = 3) => {
-    if (!searchTerm) return items;
-    
-    const term = searchTerm.toLowerCase().trim();
-    
-    // Dividir em palavras para busca por palavra-chave
-    const searchWords = term.split(/\s+/);
-    
-    const scored = items.map((item) => {
-      const itemLower = item.toLowerCase();
-      let score = 0;
-      
-      // Score alto para matches no início
-      if (itemLower.startsWith(term)) {
-        score += 1000;
-      }
-      
-      // Score para cada palavra-chave encontrada
-      searchWords.forEach((word) => {
-        if (itemLower.startsWith(word)) {
-          score += 500; // Match no início de uma palavra
-        } else if (itemLower.includes(` ${word}`)) {
-          score += 250; // Match após espaço
-        } else if (itemLower.includes(word)) {
-          score += 100; // Match em qualquer lugar
-        }
-      });
-      
-      return { item, score };
-    });
-    
-    return scored
-      .filter(({ score }) => score > 0)
-      .sort((a, b) => b.score - a.score)
-      .slice(0, limit)
-      .map(({ item }) => item);
-  };
-
-  // Filtrar jogos por busca
-  const filteredGames = intelligentFilter(games, gameSearch);
-
-  // Filtrar CPUs por busca
-  const filteredCpus = intelligentFilter(cpus, cpuSearch);
-
-  // Filtrar GPUs por busca
-  const filteredGpus = intelligentFilter(gpus, gpuSearch);
-
-  // Filtrar RAMs por busca
-  const filteredRams = intelligentFilter(rams, ramSearch);
+  const { results: gameSearchResults, loading: gameSearchLoading } = useGameSearch(gameSearch, 10);
+  const { results: cpuSearchResults, loading: cpuSearchLoading } = useCpuSearch(cpuSearch, 10);
+  const { results: gpuSearchResults, loading: gpuSearchLoading } = useGpuSearch(gpuSearch, 10);
+  const filteredRams = filterRamOptions(rams, ramSearch, 10);
 
   // Submeter formulário
   const handleEstimate = async (e) => {
@@ -275,22 +189,28 @@ export default function Estimate() {
                     className="w-full bg-transparent border-b border-white/20 focus:border-cyan-400 py-3 text-white font-body-md outline-none transition-all placeholder:text-slate-600"
                   />
                   {/* Dropdown de jogos */}
-                  {gameSearch && filteredGames.length > 0 && (
+                  {gameSearchLoading && (
+                    <p className="text-xs text-slate-500 mt-2">Buscando jogos...</p>
+                  )}
+                  {gameSearch && !gameSearchLoading && gameSearchResults.length > 0 && (
                     <div className="absolute top-full left-0 right-0 bg-slate-900 border border-cyan-500/40 rounded mt-2 max-h-64 overflow-y-auto z-50">
-                      {filteredGames.slice(0, 10).map((game) => (
+                      {gameSearchResults.map((game) => (
                         <button
-                          key={game}
+                          key={game.id}
                           type="button"
                           onClick={() => {
-                            setSelectedGame(game);
+                            setSelectedGame(game.name);
                             setGameSearch('');
                           }}
                           className="w-full px-4 py-2 text-left text-cyan-300 hover:bg-cyan-500/30 hover:text-cyan-100 transition-colors text-sm"
                         >
-                          {game}
+                          {game.name}
                         </button>
                       ))}
                     </div>
+                  )}
+                  {gameSearch && !gameSearchLoading && gameSearchResults.length === 0 && (
+                    <p className="text-xs text-slate-500 mt-2">Nenhum jogo encontrado.</p>
                   )}
                 </div>
                 {selectedGame && (
@@ -344,79 +264,33 @@ export default function Estimate() {
                 </div>
               </div>
 
-              {/* Processor */}
-              <div>
-                <label className="block font-label-caps text-[12px] text-cyan-500 mb-2">
-                  PROCESSOR_UNIT (CPU)
-                </label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    placeholder="Buscar CPU..."
-                    value={cpuSearch}
-                    onChange={(e) => setCpuSearch(e.target.value)}
-                    className="w-full bg-transparent border-b border-white/20 focus:border-cyan-400 py-3 px-0 text-white font-body-md outline-none transition-all placeholder:text-slate-600"
-                  />
-                  {/* Dropdown de CPUs */}
-                  {cpuSearch && filteredCpus.length > 0 && (
-                    <div className="absolute top-full left-0 right-0 bg-slate-900 border border-cyan-500/40 rounded mt-2 max-h-48 overflow-y-auto z-50">
-                      {filteredCpus.map((cpu) => (
-                        <button
-                          key={cpu}
-                          type="button"
-                          onClick={() => {
-                            setSelectedCPU(cpu);
-                            setCpuSearch('');
-                          }}
-                          className="w-full px-4 py-2 text-left text-cyan-300 hover:bg-cyan-500/30 hover:text-cyan-100 transition-colors text-sm"
-                        >
-                          {cpu}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                {selectedCPU && (
-                  <p className="text-xs text-cyan-400 mt-2">Selecionado: {selectedCPU}</p>
-                )}
-              </div>
+              <HardwareSearchInput
+                label="PROCESSOR_UNIT (CPU)"
+                placeholder="Buscar CPU..."
+                search={cpuSearch}
+                onSearchChange={setCpuSearch}
+                results={cpuSearchResults}
+                loading={cpuSearchLoading}
+                selected={selectedCPU}
+                onSelect={(name) => {
+                  setSelectedCPU(name);
+                  setCpuSearch('');
+                }}
+              />
 
-              {/* Graphics */}
-              <div>
-                <label className="block font-label-caps text-[12px] text-cyan-500 mb-2">
-                  GRAPHICS_UNIT (GPU)
-                </label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    placeholder="Buscar GPU..."
-                    value={gpuSearch}
-                    onChange={(e) => setGpuSearch(e.target.value)}
-                    className="w-full bg-transparent border-b border-white/20 focus:border-cyan-400 py-3 px-0 text-white font-body-md outline-none transition-all placeholder:text-slate-600"
-                  />
-                  {/* Dropdown de GPUs */}
-                  {gpuSearch && filteredGpus.length > 0 && (
-                    <div className="absolute top-full left-0 right-0 bg-slate-900 border border-cyan-500/40 rounded mt-2 max-h-48 overflow-y-auto z-50">
-                      {filteredGpus.map((gpu) => (
-                        <button
-                          key={gpu}
-                          type="button"
-                          onClick={() => {
-                            setSelectedGPU(gpu);
-                            setGpuSearch('');
-                          }}
-                          className="w-full px-4 py-2 text-left text-cyan-300 hover:bg-cyan-500/30 hover:text-cyan-100 transition-colors text-sm"
-                        >
-                          {gpu}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                {selectedGPU && (
-                  <p className="text-xs text-cyan-400 mt-2">Selecionado: {selectedGPU}</p>
-                )}
-              </div>
+              <HardwareSearchInput
+                label="GRAPHICS_UNIT (GPU)"
+                placeholder="Buscar GPU..."
+                search={gpuSearch}
+                onSearchChange={setGpuSearch}
+                results={gpuSearchResults}
+                loading={gpuSearchLoading}
+                selected={selectedGPU}
+                onSelect={(name) => {
+                  setSelectedGPU(name);
+                  setGpuSearch('');
+                }}
+              />
 
               {/* Memory */}
               <div>

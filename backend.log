@@ -1,127 +1,91 @@
 INFO:     Will watch for changes in these directories: ['/home/mt-thome/Projetos/fps-estimator']
 INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
-INFO:     Started reloader process [43768] using WatchFiles
-INFO:     Started server process [43808]
+INFO:     Started reloader process [14416] using WatchFiles
+INFO:     Started server process [14452]
 INFO:     Waiting for application startup.
 INFO:     Application startup complete.
-INFO:     127.0.0.1:41942 - "POST /auth/login HTTP/1.1" 500 Internal Server Error
-ERROR:    Exception in ASGI application
-Traceback (most recent call last):
-  File "/home/mt-thome/Projetos/.venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
-    self.dialect.do_execute(
-  File "/home/mt-thome/Projetos/.venv/lib/python3.12/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
-    cursor.execute(statement, parameters)
-psycopg2.errors.UndefinedColumn: column users.gpu does not exist
-LINE 1: ...mail, users.profile_photo AS users_profile_photo, users.gpu ...
-                                                             ^
-
-
-The above exception was the direct cause of the following exception:
-
-Traceback (most recent call last):
-  File "/home/mt-thome/Projetos/.venv/lib/python3.12/site-packages/uvicorn/protocols/http/httptools_impl.py", line 421, in run_asgi
-    result = await app(  # type: ignore[func-returns-value]
-             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/mt-thome/Projetos/.venv/lib/python3.12/site-packages/uvicorn/middleware/proxy_headers.py", line 56, in __call__
-    return await self.app(scope, receive, send)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/mt-thome/Projetos/.venv/lib/python3.12/site-packages/fastapi/applications.py", line 1159, in __call__
-    await super().__call__(scope, receive, send)
-  File "/home/mt-thome/Projetos/.venv/lib/python3.12/site-packages/starlette/applications.py", line 90, in __call__
-    await self.middleware_stack(scope, receive, send)
-  File "/home/mt-thome/Projetos/.venv/lib/python3.12/site-packages/starlette/middleware/errors.py", line 186, in __call__
-    raise exc
-  File "/home/mt-thome/Projetos/.venv/lib/python3.12/site-packages/starlette/middleware/errors.py", line 164, in __call__
-    await self.app(scope, receive, _send)
-  File "/home/mt-thome/Projetos/.venv/lib/python3.12/site-packages/starlette/middleware/cors.py", line 96, in __call__
-    await self.simple_response(scope, receive, send, request_headers=headers)
-  File "/home/mt-thome/Projetos/.venv/lib/python3.12/site-packages/starlette/middleware/cors.py", line 154, in simple_response
-    await self.app(scope, receive, send)
-  File "/home/mt-thome/Projetos/.venv/lib/python3.12/site-packages/starlette/middleware/exceptions.py", line 63, in __call__
-    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
-  File "/home/mt-thome/Projetos/.venv/lib/python3.12/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
-    raise exc
-  File "/home/mt-thome/Projetos/.venv/lib/python3.12/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
-    await app(scope, receive, sender)
-  File "/home/mt-thome/Projetos/.venv/lib/python3.12/site-packages/fastapi/middleware/asyncexitstack.py", line 18, in __call__
-    await self.app(scope, receive, send)
-  File "/home/mt-thome/Projetos/.venv/lib/python3.12/site-packages/starlette/routing.py", line 660, in __call__
-    await self.middleware_stack(scope, receive, send)
-  File "/home/mt-thome/Projetos/.venv/lib/python3.12/site-packages/starlette/routing.py", line 680, in app
-    await route.handle(scope, receive, send)
-  File "/home/mt-thome/Projetos/.venv/lib/python3.12/site-packages/starlette/routing.py", line 276, in handle
-    await self.app(scope, receive, send)
-  File "/home/mt-thome/Projetos/.venv/lib/python3.12/site-packages/fastapi/routing.py", line 134, in app
-    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
-  File "/home/mt-thome/Projetos/.venv/lib/python3.12/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
-    raise exc
-  File "/home/mt-thome/Projetos/.venv/lib/python3.12/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
-    await app(scope, receive, sender)
-  File "/home/mt-thome/Projetos/.venv/lib/python3.12/site-packages/fastapi/routing.py", line 120, in app
-    response = await f(request)
-               ^^^^^^^^^^^^^^^^
-  File "/home/mt-thome/Projetos/.venv/lib/python3.12/site-packages/fastapi/routing.py", line 674, in app
-    raw_response = await run_endpoint_function(
-                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/mt-thome/Projetos/.venv/lib/python3.12/site-packages/fastapi/routing.py", line 328, in run_endpoint_function
-    return await dependant.call(**values)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/mt-thome/Projetos/.venv/lib/python3.12/site-packages/slowapi/extension.py", line 734, in async_wrapper
-    response = await func(*args, **kwargs)  # type: ignore
-               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/mt-thome/Projetos/fps-estimator/fps_api/../fps_api/../fps_api/auth_router.py", line 262, in login
-    user = authenticate_user(login_data.email, login_data.password, session)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/mt-thome/Projetos/fps-estimator/fps_api/../fps_api/../fps_api/auth_router.py", line 62, in authenticate_user
-    user = session.query(Users).filter(Users.email == email).first()
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/mt-thome/Projetos/.venv/lib/python3.12/site-packages/sqlalchemy/orm/query.py", line 2766, in first
-    return self.limit(1)._iter().first()  # type: ignore
-           ^^^^^^^^^^^^^^^^^^^^^
-  File "/home/mt-thome/Projetos/.venv/lib/python3.12/site-packages/sqlalchemy/orm/query.py", line 2864, in _iter
-    result: Union[ScalarResult[_T], Result[_T]] = self.session.execute(
-                                                  ^^^^^^^^^^^^^^^^^^^^^
-  File "/home/mt-thome/Projetos/.venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 2351, in execute
-    return self._execute_internal(
-           ^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/mt-thome/Projetos/.venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 2249, in _execute_internal
-    result: Result[Any] = compile_state_cls.orm_execute_statement(
-                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/mt-thome/Projetos/.venv/lib/python3.12/site-packages/sqlalchemy/orm/context.py", line 306, in orm_execute_statement
-    result = conn.execute(
-             ^^^^^^^^^^^^^
-  File "/home/mt-thome/Projetos/.venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1419, in execute
-    return meth(
-           ^^^^^
-  File "/home/mt-thome/Projetos/.venv/lib/python3.12/site-packages/sqlalchemy/sql/elements.py", line 527, in _execute_on_connection
-    return connection._execute_clauseelement(
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/mt-thome/Projetos/.venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1641, in _execute_clauseelement
-    ret = self._execute_context(
-          ^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/mt-thome/Projetos/.venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1846, in _execute_context
-    return self._exec_single_context(
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/mt-thome/Projetos/.venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1986, in _exec_single_context
-    self._handle_dbapi_exception(
-  File "/home/mt-thome/Projetos/.venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 2363, in _handle_dbapi_exception
-    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
-  File "/home/mt-thome/Projetos/.venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
-    self.dialect.do_execute(
-  File "/home/mt-thome/Projetos/.venv/lib/python3.12/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
-    cursor.execute(statement, parameters)
-sqlalchemy.exc.ProgrammingError: (psycopg2.errors.UndefinedColumn) column users.gpu does not exist
-LINE 1: ...mail, users.profile_photo AS users_profile_photo, users.gpu ...
-                                                             ^
-
-[SQL: SELECT users.id AS users_id, users.name AS users_name, users.email AS users_email, users.profile_photo AS users_profile_photo, users.gpu AS users_gpu, users.cpu AS users_cpu, users.ram AS users_ram, users.gpu_id AS users_gpu_id, users.cpu_id AS users_cpu_id, users.password AS users_password, users.otp_secret AS users_otp_secret, users.ativo AS users_ativo 
-FROM users 
-WHERE users.email = %(email_1)s 
- LIMIT %(param_1)s]
-[parameters: {'email_1': 'matheusthomedasilva@gmail.com', 'param_1': 1}]
-(Background on this error at: https://sqlalche.me/e/20/f405)
+INFO:     127.0.0.1:38082 - "GET /hardware/cpus/search?q=ryzen&limit=5 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60674 - "GET /hardware/gpus/search?q=rtx&limit=5 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37548 - "OPTIONS /hardware/games/search?q=Cy&limit=10 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37548 - "GET /hardware/games/search?q=Cy&limit=10 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37554 - "OPTIONS /hardware/games/search?q=Cyp&limit=10 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37568 - "OPTIONS /hardware/games/search?q=Cyper&limit=10 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37578 - "GET /hardware/games/search?q=Cyber&limit=10 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37584 - "GET /hardware/games/search?q=Cyberpunk&limit=10 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60136 - "GET /auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60136 - "GET /auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60136 - "GET /games/all-info HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60152 - "GET /games/user_list HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54372 - "GET /games/all-info HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49666 - "GET /auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60136 - "OPTIONS /hardware/cpus/search?q=Ryzen&limit=10 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60152 - "GET /games/user_list HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60136 - "GET /hardware/cpus/search?q=Ryzen&limit=10 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54372 - "OPTIONS /hardware/cpus/search?q=Ryzen+5&limit=10 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49666 - "GET /auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54372 - "GET /hardware/cpus/search?q=Ryzen+5&limit=10 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49666 - "OPTIONS /hardware/cpus/search?q=Ryzen+5+3&limit=10 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49666 - "GET /hardware/cpus/search?q=Ryzen+5+3&limit=10 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54372 - "GET /hardware/cpus/search?q=Ryzen+5&limit=10 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54372 - "OPTIONS /hardware/cpus/search?q=Ryzen+5+3600&limit=10 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54372 - "GET /hardware/cpus/search?q=Ryzen+5+3600&limit=10 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55434 - "OPTIONS /hardware/gpus/search?q=Gefor&limit=10 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55434 - "GET /hardware/gpus/search?q=Gefor&limit=10 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55444 - "OPTIONS /hardware/gpus/search?q=Geforce&limit=10 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55444 - "GET /hardware/gpus/search?q=Geforce&limit=10 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55444 - "OPTIONS /hardware/gpus/search?q=Geforce+RTX&limit=10 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55444 - "GET /hardware/gpus/search?q=Geforce+RTX&limit=10 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55444 - "OPTIONS /hardware/gpus/search?q=Geforce+RTX+20&limit=10 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55444 - "GET /hardware/gpus/search?q=Geforce+RTX+20&limit=10 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55444 - "OPTIONS /hardware/gpus/search?q=Geforce+RTX+2060&limit=10 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55444 - "GET /hardware/gpus/search?q=Geforce+RTX+2060&limit=10 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55444 - "OPTIONS /hardware/gpus/search?q=Geforce+RTX+2060+Su&limit=10 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55444 - "GET /hardware/gpus/search?q=Geforce+RTX+2060+Su&limit=10 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49446 - "POST /profile/edit_setup HTTP/1.1" 422 Unprocessable Entity
+WARNING:  WatchFiles detected changes in 'fps_api/schemas.py'. Reloading...
 INFO:     Shutting down
 INFO:     Waiting for application shutdown.
 INFO:     Application shutdown complete.
-INFO:     Finished server process [43808]
-INFO:     Stopping reloader process [43768]
+INFO:     Finished server process [14452]
+WARNING:  WatchFiles detected changes in 'fps_api/user_router.py'. Reloading...
+INFO:     Started server process [15535]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [15535]
+WARNING:  WatchFiles detected changes in 'fps_api/user_router.py'. Reloading...
+INFO:     Started server process [15555]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [15555]
+WARNING:  WatchFiles detected changes in 'fps_api/user_router.py'. Reloading...
+INFO:     Started server process [15575]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [15575]
+WARNING:  WatchFiles detected changes in 'fps_api/user_router.py'. Reloading...
+INFO:     Started server process [15590]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [15590]
+INFO:     Started server process [15610]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     127.0.0.1:37116 - "GET /games/all-info HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37106 - "GET /auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37128 - "GET /games/user_list HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [15610]

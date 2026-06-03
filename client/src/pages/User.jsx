@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { GlassPanel } from '../components/GlassPanel';
-import * as hardwareAPI from '../api/hardware';
 import * as userAPI from '../api/user';
+import { useCpuSearch, useGpuSearch } from '../hooks/useHardwareSearch';
+import { filterRamOptions } from '../utils/filterRam';
 import * as gamesAPI from '../api/games';
 
 export default function User() {
@@ -12,11 +13,9 @@ export default function User() {
     gpu: '',
     ram: ''
   });
-  const [editingField, setEditingField] = useState(null);
+  const [editingFields, setEditingFields] = useState(() => new Set());
+  const [modifiedFields, setModifiedFields] = useState(() => new Set());
 
-  // Estado para hardware disponível
-  const [cpus, setCpus] = useState([]);
-  const [gpus, setGpus] = useState([]);
   const [rams] = useState([
     '128GB DDR5',
     '64GB DDR5',
@@ -56,10 +55,8 @@ export default function User() {
     const loadData = async () => {
       try {
         setLoadingUser(true);
-        const [user, gpuList, cpuList, gamesList] = await Promise.all([
+        const [user, gamesList] = await Promise.all([
           userAPI.get_current_user(),
-          hardwareAPI.get_gpus_list(),
-          hardwareAPI.get_cpus_list(),
           gamesAPI.get_all_games_info(),
         ]);
 
@@ -69,12 +66,6 @@ export default function User() {
           gpu: user.gpu || '',
           ram: user.ram || ''
         });
-
-        const gpuNames = Array.isArray(gpuList.gpus) ? gpuList.gpus.map((g) => (typeof g === 'string' ? g : g.name)) : [];
-        const cpuNames = Array.isArray(cpuList.cpus) ? cpuList.cpus.map((c) => (typeof c === 'string' ? c : c.name)) : [];
-        
-        setCpus(cpuNames);
-        setGpus(gpuNames);
 
         // Processar jogos
         if (gamesList.games && Array.isArray(gamesList.games)) {
@@ -110,44 +101,132 @@ export default function User() {
     loadUserGames();
   }, []);
 
-  // Função de filtro inteligente
-  const intelligentFilter = (items, searchTerm, limit = 3) => {
-    if (!searchTerm) return items;
-    
-    const term = searchTerm.toLowerCase().trim();
-    const searchWords = term.split(/\s+/);
-    
-    const scored = items.map((item) => {
-      const itemLower = item.toLowerCase();
-      let score = 0;
-      
-      if (itemLower.startsWith(term)) {
-        score += 1000;
-      }
-      
-      searchWords.forEach((word) => {
-        if (itemLower.startsWith(word)) {
-          score += 500;
-        } else if (itemLower.includes(` ${word}`)) {
-          score += 250;
-        } else if (itemLower.includes(word)) {
-          score += 100;
-        }
-      });
-      
-      return { item, score };
-    });
-    
-    return scored
-      .filter(({ score }) => score > 0)
-      .sort((a, b) => b.score - a.score)
-      .slice(0, limit)
-      .map(({ item }) => item);
+  const cpuFieldActive = editingFields.has('cpu');
+  const gpuFieldActive = editingFields.has('gpu');
+  const { results: cpuSearchResults, loading: cpuSearchLoading } = useCpuSearch(
+    cpuFieldActive ? cpuSearch : '',
+    10,
+  );
+  const { results: gpuSearchResults, loading: gpuSearchLoading } = useGpuSearch(
+    gpuFieldActive ? gpuSearch : '',
+    10,
+  );
+  const ramSearchResults = filterRamOptions(
+    rams,
+    editingFields.has('ram') ? ramSearch : '',
+    10,
+  );
+
+  const markFieldModified = (field) => {
+    setModifiedFields((prev) => new Set(prev).add(field));
   };
 
-  const filteredCpus = intelligentFilter(cpus, cpuSearch);
-  const filteredGpus = intelligentFilter(gpus, gpuSearch);
-  const filteredRams = intelligentFilter(rams, ramSearch);
+  const startEditing = (field) => {
+    setEditingFields((prev) => new Set(prev).add(field));
+    markFieldModified(field);
+    if (field === 'cpu') setCpuSearch('');
+    if (field === 'gpu') setGpuSearch('');
+    if (field === 'ram') setRamSearch('');
+  };
+
+  const clearEditSession = () => {
+    setEditingFields(new Set());
+    setModifiedFields(new Set());
+    setCpuSearch('');
+    setGpuSearch('');
+    setRamSearch('');
+  };
+
+  const hasPendingChanges = modifiedFields.size > 0;
+
+  const handleConfigChange = (field, value) => {
+    setSystemConfig((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
+
+  const renderHardwareField = ({
+    field,
+    label,
+    placeholder,
+    search,
+    setSearch,
+    searchResults,
+    searchLoading,
+    configValue,
+  }) => {
+    const isEditing = editingFields.has(field);
+    const isModified = modifiedFields.has(field);
+    const showSelected = isModified && configValue;
+    const readOnlyDisplay = isModified ? '' : (configValue || 'Clique para selecionar...');
+
+    const finishSelection = (item) => {
+      handleConfigChange(field, item);
+      setSearch('');
+      setEditingFields((prev) => {
+        const next = new Set(prev);
+        next.delete(field);
+        return next;
+      });
+    };
+
+    return (
+      <div className="space-y-2">
+        <label className="block font-label-caps text-[12px] text-cyan-500 mb-2">{label}</label>
+        {isEditing ? (
+          <div className="relative">
+            <input
+              type="text"
+              placeholder={placeholder}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              autoFocus
+              className="w-full bg-transparent border-b border-white/20 focus:border-cyan-400 py-3 px-0 text-white font-body-md outline-none transition-all placeholder:text-slate-600"
+            />
+            {searchLoading && (
+              <p className="text-xs text-slate-500 mt-2">Buscando...</p>
+            )}
+            {search && !searchLoading && searchResults.length > 0 && (
+              <div className="absolute top-full left-0 right-0 bg-slate-900 border border-cyan-500/40 rounded mt-2 max-h-48 overflow-y-auto z-50">
+                {searchResults.map((item) => {
+                  const name = typeof item === 'string' ? item : item.name;
+                  const key = typeof item === 'string' ? item : item.id;
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => finishSelection(name)}
+                      className="w-full px-4 py-2 text-left text-cyan-300 hover:bg-cyan-500/30 hover:text-cyan-100 transition-colors text-sm"
+                    >
+                      {name}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            {search && !searchLoading && searchResults.length === 0 && (
+              <p className="text-xs text-slate-500 mt-2">Nenhum resultado encontrado.</p>
+            )}
+          </div>
+        ) : (
+          <div onClick={() => startEditing(field)} className="relative group cursor-pointer">
+            <input
+              type="text"
+              value={readOnlyDisplay}
+              readOnly
+              placeholder={isModified ? placeholder : undefined}
+              className="w-full bg-transparent border-b border-white/20 py-3 px-0 text-white font-body-md outline-none cursor-pointer placeholder:text-slate-600"
+            />
+            <div className="absolute bottom-0 left-0 h-[2px] w-0 bg-cyan-400 group-hover:w-full transition-all duration-300" />
+          </div>
+        )}
+        {showSelected && (
+          <p className="text-xs text-cyan-400">Selecionado: {configValue}</p>
+        )}
+      </div>
+    );
+  };
 
   // Atualizar configuração do sistema
   const handleUpdateSystem = async () => {
@@ -161,19 +240,19 @@ export default function User() {
       setSuccess('');
       const updated = await userAPI.edit_user_setup(systemConfig);
       setUserData(updated);
-      setEditingField(null);
+      clearEditSession();
       setSuccess('Configuração de hardware atualizada com sucesso!');
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
-      setError(err.message || 'Erro ao atualizar configuração');
+      const detail = err.response?.data?.detail;
+      if (Array.isArray(detail)) {
+        setError(detail.map((d) => d.msg).join('; '));
+      } else if (typeof detail === 'string') {
+        setError(detail);
+      } else {
+        setError(err.message || 'Erro ao atualizar configuração');
+      }
     }
-  };
-
-  const handleConfigChange = (field, value) => {
-    setSystemConfig(prev => ({
-      ...prev,
-      [field]: value
-    }));
   };
 
   return (
@@ -211,156 +290,48 @@ export default function User() {
           </div>
 
           <div className="p-8 grid grid-cols-1 md:grid-cols-3 gap-8">
-            {/* CPU Field */}
-            <div className="space-y-2">
-              <label className="font-label-caps text-xs text-on-surface-variant">Central Processing Unit</label>
-              {editingField === 'cpu' ? (
-                <div className="relative">
-                  <input
-                    type="text"
-                    placeholder="Search CPU..."
-                    value={cpuSearch}
-                    onChange={(e) => setCpuSearch(e.target.value)}
-                    className="w-full bg-slate-900/40 border-0 border-b border-cyan-500/30 py-3 px-0 font-headline-md text-cyan-400 focus:ring-0 focus:border-cyan-400 focus:bg-cyan-500/5 transition-all outline-none"
-                  />
-                  {cpuSearch && filteredCpus.length > 0 && (
-                    <div className="absolute top-full left-0 right-0 bg-slate-900 border border-cyan-500/40 rounded mt-2 max-h-40 overflow-y-auto z-50">
-                      {filteredCpus.map((cpu) => (
-                        <button
-                          key={cpu}
-                          type="button"
-                          onClick={() => {
-                            handleConfigChange('cpu', cpu);
-                            setCpuSearch('');
-                          }}
-                          className="w-full px-4 py-2 text-left text-cyan-300 hover:bg-cyan-500/30 transition-colors text-sm"
-                        >
-                          {cpu}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div
-                  onClick={() => setEditingField('cpu')}
-                  className="relative group cursor-pointer"
-                >
-                  <input
-                    type="text"
-                    value={systemConfig.cpu}
-                    readOnly
-                    className="w-full bg-slate-900/40 border-0 border-b border-cyan-500/30 py-3 px-0 font-headline-md text-cyan-400 focus:ring-0 focus:border-cyan-400 focus:bg-cyan-500/5 transition-all outline-none cursor-pointer"
-                  />
-                  <div className="absolute bottom-0 left-0 h-[2px] w-0 bg-cyan-400 group-hover:w-full transition-all duration-300"></div>
-                </div>
-              )}
-              <p className="font-label-caps text-[9px] text-slate-500">MAX_FREQ: 5.8GHZ</p>
-            </div>
-
-            {/* GPU Field */}
-            <div className="space-y-2">
-              <label className="font-label-caps text-xs text-on-surface-variant">Graphics Processor</label>
-              {editingField === 'gpu' ? (
-                <div className="relative">
-                  <input
-                    type="text"
-                    placeholder="Search GPU..."
-                    value={gpuSearch}
-                    onChange={(e) => setGpuSearch(e.target.value)}
-                    className="w-full bg-slate-900/40 border-0 border-b border-cyan-500/30 py-3 px-0 font-headline-md text-cyan-400 focus:ring-0 focus:border-cyan-400 focus:bg-cyan-500/5 transition-all outline-none"
-                  />
-                  {gpuSearch && filteredGpus.length > 0 && (
-                    <div className="absolute top-full left-0 right-0 bg-slate-900 border border-cyan-500/40 rounded mt-2 max-h-40 overflow-y-auto z-50">
-                      {filteredGpus.map((gpu) => (
-                        <button
-                          key={gpu}
-                          type="button"
-                          onClick={() => {
-                            handleConfigChange('gpu', gpu);
-                            setGpuSearch('');
-                          }}
-                          className="w-full px-4 py-2 text-left text-cyan-300 hover:bg-cyan-500/30 transition-colors text-sm"
-                        >
-                          {gpu}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div
-                  onClick={() => setEditingField('gpu')}
-                  className="relative group cursor-pointer"
-                >
-                  <input
-                    type="text"
-                    value={systemConfig.gpu}
-                    readOnly
-                    className="w-full bg-slate-900/40 border-0 border-b border-cyan-500/30 py-3 px-0 font-headline-md text-cyan-400 focus:ring-0 focus:border-cyan-400 focus:bg-cyan-500/5 transition-all outline-none cursor-pointer"
-                  />
-                  <div className="absolute bottom-0 left-0 h-[2px] w-0 bg-cyan-400 group-hover:w-full transition-all duration-300"></div>
-                </div>
-              )}
-              <p className="font-label-caps text-[9px] text-slate-500">VRAM: 24GB GDDR6X</p>
-            </div>
-
-            {/* RAM Field */}
-            <div className="space-y-2">
-              <label className="font-label-caps text-xs text-on-surface-variant">System Memory</label>
-              {editingField === 'ram' ? (
-                <div className="relative">
-                  <input
-                    type="text"
-                    placeholder="Search RAM..."
-                    value={ramSearch}
-                    onChange={(e) => setRamSearch(e.target.value)}
-                    className="w-full bg-slate-900/40 border-0 border-b border-cyan-500/30 py-3 px-0 font-headline-md text-cyan-400 focus:ring-0 focus:border-cyan-400 focus:bg-cyan-500/5 transition-all outline-none"
-                  />
-                  {ramSearch && filteredRams.length > 0 && (
-                    <div className="absolute top-full left-0 right-0 bg-slate-900 border border-cyan-500/40 rounded mt-2 max-h-40 overflow-y-auto z-50">
-                      {filteredRams.map((ram) => (
-                        <button
-                          key={ram}
-                          type="button"
-                          onClick={() => {
-                            handleConfigChange('ram', ram);
-                            setRamSearch('');
-                          }}
-                          className="w-full px-4 py-2 text-left text-cyan-300 hover:bg-cyan-500/30 transition-colors text-sm"
-                        >
-                          {ram}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div
-                  onClick={() => setEditingField('ram')}
-                  className="relative group cursor-pointer"
-                >
-                  <input
-                    type="text"
-                    value={systemConfig.ram}
-                    readOnly
-                    className="w-full bg-slate-900/40 border-0 border-b border-cyan-500/30 py-3 px-0 font-headline-md text-cyan-400 focus:ring-0 focus:border-cyan-400 focus:bg-cyan-500/5 transition-all outline-none cursor-pointer"
-                  />
-                  <div className="absolute bottom-0 left-0 h-[2px] w-0 bg-cyan-400 group-hover:w-full transition-all duration-300"></div>
-                </div>
-              )}
-              <p className="font-label-caps text-[9px] text-slate-500">LATENCY: CL30</p>
-            </div>
+            {renderHardwareField({
+              field: 'cpu',
+              label: 'PROCESSOR_UNIT (CPU)',
+              placeholder: 'Buscar CPU...',
+              search: cpuSearch,
+              setSearch: setCpuSearch,
+              searchResults: cpuSearchResults,
+              searchLoading: cpuSearchLoading,
+              configValue: systemConfig.cpu,
+            })}
+            {renderHardwareField({
+              field: 'gpu',
+              label: 'GRAPHICS_UNIT (GPU)',
+              placeholder: 'Buscar GPU...',
+              search: gpuSearch,
+              setSearch: setGpuSearch,
+              searchResults: gpuSearchResults,
+              searchLoading: gpuSearchLoading,
+              configValue: systemConfig.gpu,
+            })}
+            {renderHardwareField({
+              field: 'ram',
+              label: 'SYSTEM_MEMORY (RAM)',
+              placeholder: 'Buscar RAM...',
+              search: ramSearch,
+              setSearch: setRamSearch,
+              searchResults: ramSearchResults,
+              searchLoading: false,
+              configValue: systemConfig.ram,
+            })}
           </div>
 
           <div className="px-8 pb-8 flex justify-end gap-3">
-            {editingField && (
+            {hasPendingChanges && (
               <button
                 onClick={() => {
-                  setEditingField(null);
-                  setCpuSearch('');
-                  setGpuSearch('');
-                  setRamSearch('');
+                  clearEditSession();
+                  setSystemConfig({
+                    cpu: userData?.cpu || '',
+                    gpu: userData?.gpu || '',
+                    ram: userData?.ram || '',
+                  });
                 }}
                 className="bg-slate-700 text-white font-label-caps py-3 px-8 rounded-lg font-bold hover:bg-slate-600 transition-all active:scale-95"
               >
@@ -369,7 +340,7 @@ export default function User() {
             )}
             <button
               onClick={handleUpdateSystem}
-              disabled={!editingField}
+              disabled={!hasPendingChanges}
               className="bg-gradient-to-r from-cyan-400 to-violet-500 text-slate-950 font-label-caps py-3 px-8 rounded-lg font-bold hover:scale-105 transition-all shadow-[0_0_20px_rgba(0,240,255,0.3)] active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
             >
               UPDATE SYSTEM ARCHITECTURE

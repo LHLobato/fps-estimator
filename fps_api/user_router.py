@@ -13,6 +13,7 @@ from fps_api.dependencies import get_current_user_id, get_session
 from fps_api.build_db import Users
 # from model.text_func import get_embedding  # Lazy import
 from passlib.context import CryptContext
+from uuid import UUID
 
 bcrypt_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -21,7 +22,12 @@ user_router = APIRouter(prefix="/profile", tags=["profile", "edit", "setup"])
 
 @user_router.post("/edit_setup", response_model=UserResponse)
 @limiter.limit("5/minute")
-async def edit_setup(request: Request, data: UserAlterSetup, session: Session = Depends(get_session), user_id: int = Depends(get_current_user_id)):
+async def edit_setup(
+    request: Request,
+    data: UserAlterSetup,
+    session: Session = Depends(get_session),
+    user_id: UUID = Depends(get_current_user_id),
+):
     # Lazy import para evitar sentence_transformers no startup
     from model.text_func import get_embedding
     
@@ -62,14 +68,20 @@ async def edit_setup(request: Request, data: UserAlterSetup, session: Session = 
         name=user.name,
         email=user.email,
         profile_photo=user.profile_photo,
-        gpu_id=user.gpu_id,
-        cpu_id=user.cpu_id,
+        gpu=user.gpu_rel.name if user.gpu_rel else None,
+        cpu=user.cpu_rel.name if user.cpu_rel else None,
         ram=user.ram,
     )
 
+
 @user_router.post("/edit", response_model=UserResponse)
 @limiter.limit("5/minute")
-async def edit_profile(request: Request, data: UserAlter, session: Session = Depends(get_session), user_id: int = Depends(get_current_user_id)):
+async def edit_profile(
+    request: Request,
+    data: UserAlter,
+    session: Session = Depends(get_session),
+    user_id: UUID = Depends(get_current_user_id),
+):
     # Lazy import para evitar sentence_transformers no startup
     from model.text_func import get_embedding
     
@@ -104,8 +116,8 @@ async def edit_profile(request: Request, data: UserAlter, session: Session = Dep
         name=user.name,
         email=user.email,
         profile_photo=user.profile_photo,
-        gpu_id=user.gpu_id,
-        cpu_id=user.cpu_id,
+        gpu=user.gpu_rel.name if user.gpu_rel else None,
+        cpu=user.cpu_rel.name if user.cpu_rel else None,
         ram=user.ram,
     )
 
@@ -116,7 +128,7 @@ async def exclude_account(
     request: Request,
     data: ExcludeAccountRequest,
     session: Session = Depends(get_session),
-    user_id: int = Depends(get_current_user_id),
+    user_id: UUID = Depends(get_current_user_id),
 ):
     """
     Endpoint para excluir (deletar) a conta do usuário.

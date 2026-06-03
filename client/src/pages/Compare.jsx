@@ -1,14 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import DashboardGrid from '../components/DashboardGrid';
 import GlassCard from '../components/GlassCard';
-import * as hardwareAPI from '../api/hardware';
+import { HardwareSearchInput } from '../components/HardwareSearchInput';
 import * as llmAPI from '../api/llm';
+import { useGameSearch } from '../hooks/useGameSearch';
+import { useCpuSearch, useGpuSearch } from '../hooks/useHardwareSearch';
+import { filterRamOptions } from '../utils/filterRam';
 
 export default function Compare() {
-  // State para dados carregados
-  const [games, setGames] = useState([]);
-  const [gpus, setGpus] = useState([]);
-  const [cpus, setCpus] = useState([]);
   const [rams] = useState([
     '128GB DDR5',
     '64GB DDR5',
@@ -31,21 +30,17 @@ export default function Compare() {
   ]);
 
   // Setup 1 State
-  const [setup1Game, setSetup1Game] = useState('');
   const [setup1CPU, setSetup1CPU] = useState('');
   const [setup1GPU, setSetup1GPU] = useState('');
   const [setup1RAM, setSetup1RAM] = useState('');
-  const [setup1GameSearch, setSetup1GameSearch] = useState('');
   const [setup1CPUSearch, setSetup1CPUSearch] = useState('');
   const [setup1GPUSearch, setSetup1GPUSearch] = useState('');
   const [setup1RAMSearch, setSetup1RAMSearch] = useState('');
 
   // Setup 2 State
-  const [setup2Game, setSetup2Game] = useState('');
   const [setup2CPU, setSetup2CPU] = useState('');
   const [setup2GPU, setSetup2GPU] = useState('');
   const [setup2RAM, setSetup2RAM] = useState('');
-  const [setup2GameSearch, setSetup2GameSearch] = useState('');
   const [setup2CPUSearch, setSetup2CPUSearch] = useState('');
   const [setup2GPUSearch, setSetup2GPUSearch] = useState('');
   const [setup2RAMSearch, setSetup2RAMSearch] = useState('');
@@ -58,92 +53,16 @@ export default function Compare() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Fetch dados iniciais
-  useEffect(() => {
-    const fetchHardwareData = async () => {
-      try {
-        const [gamesList, gpusList, cpusList] = await Promise.all([
-          hardwareAPI.get_games_list(),
-          hardwareAPI.get_gpus_list(),
-          hardwareAPI.get_cpus_list(),
-        ]);
-
-        const gameNames = gamesList.games.map((g) => typeof g === 'string' ? g : g.name);
-        const gpuNames = Array.isArray(gpusList.gpus) ? gpusList.gpus.map((g) => (typeof g === 'string' ? g : g.name)) : [];
-        const cpuNames = Array.isArray(cpusList.cpus) ? cpusList.cpus.map((c) => (typeof c === 'string' ? c : c.name)) : [];
-
-        setGames(gameNames);
-        setGpus(gpuNames);
-        setCpus(cpuNames);
-
-        if (gpuNames.length > 0) {
-          setSetup1GPU(gpuNames[0]);
-          setSetup2GPU(gpuNames[0]);
-        }
-        if (cpuNames.length > 0) {
-          setSetup1CPU(cpuNames[0]);
-          setSetup2CPU(cpuNames[1] || cpuNames[0]);
-        }
-        setSetup1RAM(rams[0]);
-        setSetup2RAM(rams[0]);
-      } catch (err) {
-        setError('Erro ao carregar dados do hardware');
-        console.error('Erro completo:', err);
-      }
-    };
-
-    fetchHardwareData();
-  }, [rams]);
-
-  // Função de filtro inteligente
-  const intelligentFilter = (items, searchTerm, limit = 3) => {
-    if (!searchTerm) return items;
-    
-    const term = searchTerm.toLowerCase().trim();
-    const searchWords = term.split(/\s+/);
-    
-    const scored = items.map((item) => {
-      const itemLower = item.toLowerCase();
-      let score = 0;
-      
-      if (itemLower.startsWith(term)) {
-        score += 1000;
-      }
-      
-      searchWords.forEach((word) => {
-        if (itemLower.startsWith(word)) {
-          score += 500;
-        } else if (itemLower.includes(` ${word}`)) {
-          score += 250;
-        } else if (itemLower.includes(word)) {
-          score += 100;
-        }
-      });
-      
-      return { item, score };
-    });
-    
-    return scored
-      .filter(({ score }) => score > 0)
-      .sort((a, b) => b.score - a.score)
-      .slice(0, limit)
-      .map(({ item }) => item);
-  };
-
-  // Filtros Setup 1
-  const filteredSetup1Games = intelligentFilter(games, setup1GameSearch);
-  const filteredSetup1CPUs = intelligentFilter(cpus, setup1CPUSearch);
-  const filteredSetup1GPUs = intelligentFilter(gpus, setup1GPUSearch);
-  const filteredSetup1RAMs = intelligentFilter(rams, setup1RAMSearch);
-
-  // Filtros Setup 2
-  const filteredSetup2Games = intelligentFilter(games, setup2GameSearch);
-  const filteredSetup2CPUs = intelligentFilter(cpus, setup2CPUSearch);
-  const filteredSetup2GPUs = intelligentFilter(gpus, setup2GPUSearch);
-  const filteredSetup2RAMs = intelligentFilter(rams, setup2RAMSearch);
-
-  // Filtros para game de comparação
-  const filteredCompareGames = intelligentFilter(games, compareGameSearch);
+  const { results: compareGameResults, loading: compareGameLoading } = useGameSearch(
+    compareGameSearch,
+    10,
+  );
+  const { results: setup1CpuResults, loading: setup1CpuLoading } = useCpuSearch(setup1CPUSearch, 10);
+  const { results: setup1GpuResults, loading: setup1GpuLoading } = useGpuSearch(setup1GPUSearch, 10);
+  const { results: setup2CpuResults, loading: setup2CpuLoading } = useCpuSearch(setup2CPUSearch, 10);
+  const { results: setup2GpuResults, loading: setup2GpuLoading } = useGpuSearch(setup2GPUSearch, 10);
+  const filteredSetup1RAMs = filterRamOptions(rams, setup1RAMSearch, 10);
+  const filteredSetup2RAMs = filterRamOptions(rams, setup2RAMSearch, 10);
 
   // Fazer comparação
   const handleCompare = async () => {
@@ -226,69 +145,33 @@ export default function Compare() {
                   <p className="font-label-caps text-[12px] text-cyan-500">SETUP_01</p>
                 </div>
 
-                {/* Setup 1 - CPU */}
-                <div>
-                  <label className="block font-label-caps text-[12px] text-cyan-500 mb-2">CPU</label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      placeholder="Search CPU..."
-                      value={setup1CPUSearch}
-                      onChange={(e) => setSetup1CPUSearch(e.target.value)}
-                      className="w-full bg-transparent border-b border-white/20 focus:border-cyan-400 py-3 px-0 text-white font-body-md outline-none transition-all placeholder:text-slate-600"
-                    />
-                    {setup1CPUSearch && filteredSetup1CPUs.length > 0 && (
-                      <div className="absolute top-full left-0 right-0 bg-slate-900 border border-cyan-500/40 rounded mt-2 max-h-48 overflow-y-auto z-50">
-                        {filteredSetup1CPUs.map((cpu) => (
-                          <button
-                            key={cpu}
-                            type="button"
-                            onClick={() => {
-                              setSetup1CPU(cpu);
-                              setSetup1CPUSearch('');
-                            }}
-                            className="w-full px-4 py-2 text-left text-cyan-300 hover:bg-cyan-500/30 hover:text-cyan-100 transition-colors text-sm"
-                          >
-                            {cpu}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  {setup1CPU && <p className="text-xs text-cyan-400 mt-2">Selected: {setup1CPU}</p>}
-                </div>
+                <HardwareSearchInput
+                  label="CPU"
+                  placeholder="Buscar CPU..."
+                  search={setup1CPUSearch}
+                  onSearchChange={setSetup1CPUSearch}
+                  results={setup1CpuResults}
+                  loading={setup1CpuLoading}
+                  selected={setup1CPU}
+                  onSelect={(name) => {
+                    setSetup1CPU(name);
+                    setSetup1CPUSearch('');
+                  }}
+                />
 
-                {/* Setup 1 - GPU */}
-                <div>
-                  <label className="block font-label-caps text-[12px] text-cyan-500 mb-2">GPU</label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      placeholder="Search GPU..."
-                      value={setup1GPUSearch}
-                      onChange={(e) => setSetup1GPUSearch(e.target.value)}
-                      className="w-full bg-transparent border-b border-white/20 focus:border-cyan-400 py-3 px-0 text-white font-body-md outline-none transition-all placeholder:text-slate-600"
-                    />
-                    {setup1GPUSearch && filteredSetup1GPUs.length > 0 && (
-                      <div className="absolute top-full left-0 right-0 bg-slate-900 border border-cyan-500/40 rounded mt-2 max-h-48 overflow-y-auto z-50">
-                        {filteredSetup1GPUs.map((gpu) => (
-                          <button
-                            key={gpu}
-                            type="button"
-                            onClick={() => {
-                              setSetup1GPU(gpu);
-                              setSetup1GPUSearch('');
-                            }}
-                            className="w-full px-4 py-2 text-left text-cyan-300 hover:bg-cyan-500/30 hover:text-cyan-100 transition-colors text-sm"
-                          >
-                            {gpu}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  {setup1GPU && <p className="text-xs text-cyan-400 mt-2">Selected: {setup1GPU}</p>}
-                </div>
+                <HardwareSearchInput
+                  label="GPU"
+                  placeholder="Buscar GPU..."
+                  search={setup1GPUSearch}
+                  onSearchChange={setSetup1GPUSearch}
+                  results={setup1GpuResults}
+                  loading={setup1GpuLoading}
+                  selected={setup1GPU}
+                  onSelect={(name) => {
+                    setSetup1GPU(name);
+                    setSetup1GPUSearch('');
+                  }}
+                />
 
                 {/* Setup 1 - RAM */}
                 <div>
@@ -329,69 +212,33 @@ export default function Compare() {
                   <p className="font-label-caps text-[12px] text-secondary">SETUP_02</p>
                 </div>
 
-                {/* Setup 2 - CPU */}
-                <div>
-                  <label className="block font-label-caps text-[12px] text-secondary mb-2">CPU</label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      placeholder="Search CPU..."
-                      value={setup2CPUSearch}
-                      onChange={(e) => setSetup2CPUSearch(e.target.value)}
-                      className="w-full bg-transparent border-b border-white/20 focus:border-secondary py-3 px-0 text-white font-body-md outline-none transition-all placeholder:text-slate-600"
-                    />
-                    {setup2CPUSearch && filteredSetup2CPUs.length > 0 && (
-                      <div className="absolute top-full left-0 right-0 bg-slate-900 border border-secondary/40 rounded mt-2 max-h-48 overflow-y-auto z-50">
-                        {filteredSetup2CPUs.map((cpu) => (
-                          <button
-                            key={cpu}
-                            type="button"
-                            onClick={() => {
-                              setSetup2CPU(cpu);
-                              setSetup2CPUSearch('');
-                            }}
-                            className="w-full px-4 py-2 text-left text-secondary/80 hover:bg-secondary/30 hover:text-secondary transition-colors text-sm"
-                          >
-                            {cpu}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  {setup2CPU && <p className="text-xs text-secondary mt-2">Selected: {setup2CPU}</p>}
-                </div>
+                <HardwareSearchInput
+                  label="CPU"
+                  placeholder="Buscar CPU..."
+                  search={setup2CPUSearch}
+                  onSearchChange={setSetup2CPUSearch}
+                  results={setup2CpuResults}
+                  loading={setup2CpuLoading}
+                  selected={setup2CPU}
+                  onSelect={(name) => {
+                    setSetup2CPU(name);
+                    setSetup2CPUSearch('');
+                  }}
+                />
 
-                {/* Setup 2 - GPU */}
-                <div>
-                  <label className="block font-label-caps text-[12px] text-secondary mb-2">GPU</label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      placeholder="Search GPU..."
-                      value={setup2GPUSearch}
-                      onChange={(e) => setSetup2GPUSearch(e.target.value)}
-                      className="w-full bg-transparent border-b border-white/20 focus:border-secondary py-3 px-0 text-white font-body-md outline-none transition-all placeholder:text-slate-600"
-                    />
-                    {setup2GPUSearch && filteredSetup2GPUs.length > 0 && (
-                      <div className="absolute top-full left-0 right-0 bg-slate-900 border border-secondary/40 rounded mt-2 max-h-48 overflow-y-auto z-50">
-                        {filteredSetup2GPUs.map((gpu) => (
-                          <button
-                            key={gpu}
-                            type="button"
-                            onClick={() => {
-                              setSetup2GPU(gpu);
-                              setSetup2GPUSearch('');
-                            }}
-                            className="w-full px-4 py-2 text-left text-secondary/80 hover:bg-secondary/30 hover:text-secondary transition-colors text-sm"
-                          >
-                            {gpu}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  {setup2GPU && <p className="text-xs text-secondary mt-2">Selected: {setup2GPU}</p>}
-                </div>
+                <HardwareSearchInput
+                  label="GPU"
+                  placeholder="Buscar GPU..."
+                  search={setup2GPUSearch}
+                  onSearchChange={setSetup2GPUSearch}
+                  results={setup2GpuResults}
+                  loading={setup2GpuLoading}
+                  selected={setup2GPU}
+                  onSelect={(name) => {
+                    setSetup2GPU(name);
+                    setSetup2GPUSearch('');
+                  }}
+                />
 
                 {/* Setup 2 - RAM */}
                 <div>
@@ -442,22 +289,28 @@ export default function Compare() {
                 onChange={(e) => setCompareGameSearch(e.target.value)}
                 className="w-full bg-transparent border-b border-white/20 focus:border-cyan-400 py-3 px-0 text-white font-body-md outline-none transition-all placeholder:text-slate-600"
               />
-              {compareGameSearch && filteredCompareGames.length > 0 && (
+              {compareGameLoading && (
+                <p className="text-xs text-slate-500 mt-2">Buscando jogos...</p>
+              )}
+              {compareGameSearch && !compareGameLoading && compareGameResults.length > 0 && (
                 <div className="absolute top-full left-0 right-0 bg-slate-900 border border-cyan-500/40 rounded mt-2 max-h-48 overflow-y-auto z-50">
-                  {filteredCompareGames.map((game) => (
+                  {compareGameResults.map((game) => (
                     <button
-                      key={game}
+                      key={game.id}
                       type="button"
                       onClick={() => {
-                        setCompareGame(game);
+                        setCompareGame(game.name);
                         setCompareGameSearch('');
                       }}
                       className="w-full px-4 py-2 text-left text-cyan-300 hover:bg-cyan-500/30 hover:text-cyan-100 transition-colors text-sm"
                     >
-                      {game}
+                      {game.name}
                     </button>
                   ))}
                 </div>
+              )}
+              {compareGameSearch && !compareGameLoading && compareGameResults.length === 0 && (
+                <p className="text-xs text-slate-500 mt-2">Nenhum jogo encontrado.</p>
               )}
             </div>
             {compareGame && <p className="text-xs text-cyan-400 mt-2">Selected: {compareGame}</p>}

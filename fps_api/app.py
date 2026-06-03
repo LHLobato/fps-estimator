@@ -25,7 +25,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
-# CORS configuration - must be first middleware
+# CORS: origens fixas + regex para Vite/Cursor em portas dinâmicas (ex.: :58871)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -39,17 +39,13 @@ app.add_middleware(
         "http://127.0.0.1:5173",
         "http://127.0.0.1:5174",
     ],
+    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    max_age=3600
+    expose_headers=["*"],
+    max_age=3600,
 )
-
-origins=[
-    "http://localhost",
-    "http://localhost:5173",
-    "http://localhost:5174",
-]
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
