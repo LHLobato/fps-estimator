@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
 import { GlassPanel } from '../components/GlassPanel';
+import { useNavigate } from 'react-router-dom';
 import * as userAPI from '../api/user';
 import { useCpuSearch, useGpuSearch } from '../hooks/useHardwareSearch';
 import { filterRamOptions } from '../utils/filterRam';
 import * as gamesAPI from '../api/games';
 
 export default function User() {
-  // Estado do usuário
   const [userData, setUserData] = useState(null);
+  const navigate = useNavigate();
   const [systemConfig, setSystemConfig] = useState({
     cpu: '',
     gpu: '',
@@ -416,7 +417,7 @@ export default function User() {
                 {userGames.length} / {games.length}
               </span>
             </div>
-            <button className="flex items-center gap-2 font-label-caps text-xs text-cyan-400 hover:text-white transition-colors">
+            <button onClick={() => navigate('/estimate')} className="flex items-center gap-2 font-label-caps text-xs text-cyan-400 hover:text-white transition-colors">
               <span className="material-symbols-outlined text-sm">add</span>
               ADD NEW TITLE
             </button>

@@ -4,11 +4,16 @@ import * as authAPI from '../api/auth';
 
 export default function Login() {
   const navigate = useNavigate();
-  const [step, setStep] = useState('login'); // 'login' ou 'verify_code'
+  
+  // 'login', 'verify_code', 'forgot_password', 'verify_reset_token', 'new_password'
+  const [step, setStep] = useState('login'); 
+  
   const [formData, setFormData] = useState({
     email: '',
-    password: ''
+    password: '',
+    newPassword: '',
   });
+  
   const [code, setCode] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -17,82 +22,140 @@ export default function Login() {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [name]: value
+      [name]: value,
     }));
+  };
+
+  const handleResetState = () => {
+    setError('');
+    setSuccess('');
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
-    setSuccess('');
-    
+    handleResetState();
+
     if (step === 'login') {
-      // Etapa 1: Enviar email e senha
       setIsLoading(true);
       try {
         const response = await authAPI.login(formData);
-        setSuccess(response.message || 'Código de verificação enviado para seu email!');
+        setSuccess('UPLINK_ESTABLISHED: Auth code dispatched to secure comms.');
         setStep('verify_code');
       } catch (err) {
-        setError(err.response?.data?.detail || 'Erro ao fazer login');
+        setError(err.response?.data?.detail || 'ACCESS_DENIED: Invalid operator credentials.');
       } finally {
         setIsLoading(false);
       }
-    } else if (step === 'verify_code') {
-      // Etapa 2: Verificar código
+    } 
+    
+    else if (step === 'verify_code') {
       setIsLoading(true);
       try {
         const response = await authAPI.verify_code_login({
           email: formData.email,
-          code
+          code,
         });
-        
-        console.log('[LOGIN] Token recebido:', { access_token: !!response.access_token });
-        
-        // Salvar tokens
+
         localStorage.setItem('access_token', response.access_token);
         if (response.refresh_token) {
           localStorage.setItem('refresh_token', response.refresh_token);
         }
+
+        // Mensagem imersiva de sucesso
+        setSuccess('AUTHORIZATION_ACCEPTED: Initializing neural network parameters...');
         
-        console.log('[LOGIN] Tokens salvos no localStorage');
-        
-        setSuccess('Autenticação bem-sucedida! Redirecionando...');
-        
-        // Aguardar um pouco e depois redirecionar
         setTimeout(() => {
-          console.log('[LOGIN] Redirecionando para /...');
-          // Recarregar a página para forçar atualização do useAuth
           window.location.href = '/';
-        }, 1200);
+        }, 1500);
       } catch (err) {
-        console.error('[LOGIN] Erro ao verificar código:', err.response?.data);
-        setError(err.response?.data?.detail || 'Código inválido');
+        setError(err.response?.data?.detail || 'AUTH_FAILURE: Decryption sequence invalid.');
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    else if (step === 'forgot_password') {
+      setIsLoading(true);
+      try {
+        await authAPI.forgot_password({ email: formData.email });
+        setSuccess('OVERRIDE_INITIATED: Recovery cipher transmitted to your endpoint.');
+        setStep('verify_reset_token');
+      } catch (err) {
+        setError(err.response?.data?.detail || 'COMM_ERROR: Failed to trace operator identity.');
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    else if (step === 'verify_reset_token') {
+      if (!code || code.length < 5) {
+        setError('SYNTAX_ERROR: Malformed recovery cipher detected.');
+        return;
+      }
+      handleResetState();
+      setStep('new_password');
+    }
+
+    else if (step === 'new_password') {
+      setIsLoading(true);
+      try {
+        // Envia a nova senha e o token guardado no state 'code'
+        await authAPI.reset_password({
+          reset_token: code,
+          new_password: formData.newPassword
+        });
+        
+        // Mensagem mais bonita e suave ao finalizar o reset
+        setSuccess('KEYPHRASE_OVERRIDE_SUCCESSFUL. Systems re-secured. Standby for login routing...');
+        
+        setTimeout(() => {
+          setStep('login');
+          setCode('');
+          setFormData(prev => ({ ...prev, password: '', newPassword: '' }));
+          handleResetState();
+        }, 2500);
+      } catch (err) {
+        setError(err.response?.data?.detail || 'OVERRIDE_FAILED: Cipher expired or corrupted.');
       } finally {
         setIsLoading(false);
       }
     }
   };
 
-  const handleForgotPassword = () => {
-    alert('Password recovery feature coming soon...');
+  const getStepTitle = () => {
+    switch (step) {
+      case 'login': return 'Authorization Required';
+      case 'verify_code': return 'Two-Factor Protocol';
+      case 'forgot_password': return 'Identity Recovery';
+      case 'verify_reset_token': return 'Cipher Validation';
+      case 'new_password': return 'Security Override';
+      default: return '';
+    }
+  };
+
+  const getStepDescription = () => {
+    switch (step) {
+      case 'login': return 'Initialize secure connection to global neural nodes.';
+      case 'verify_code': return 'Input the 6-digit access protocol dispatched to your endpoint.';
+      case 'forgot_password': return 'Input your Operator Identity to request an emergency cipher.';
+      case 'verify_reset_token': return 'Input the emergency recovery cipher received in your comms.';
+      case 'new_password': return 'Establish and encrypt your new security keyphrase.';
+      default: return '';
+    }
   };
 
   return (
     <div className="flex h-screen bg-slate-950">
-      {/* SIDEBAR - Idêntica ao App.jsx mas desativada */}
+      {/* SIDEBAR DESATIVADA (Apenas visual) */}
       <aside className="fixed left-0 top-0 h-full w-64 border-r border-cyan-500/30 bg-slate-950/40 backdrop-blur-xl shadow-[20px_0_40px_-15px_rgba(0,0,0,0.5)] z-50 flex flex-col opacity-40 pointer-events-none">
-        {/* Logo */}
         <div className="px-2 pt-2 mx-2">
           <h1 className="text-2xl font-black tracking-tighter text-cyan-400 drop-shadow-[0_0_8px_rgba(0,240,255,0.5)] font-['Space_Grotesk'] tracking-wider uppercase">
             FPS_CORE
           </h1>
           <p className="text-[10px] text-slate-500 font-label-caps mt-1 tracking-widest">V.0.1_STABLE</p>
         </div>
-
-        {/* Nav */}
         <nav className="flex-1 mt-6 flex flex-col gap-1">
           <div className="flex items-center gap-3 px-5 h-12 rounded-sm text-slate-400">
             <span className="material-symbols-outlined text-lg">speed</span>
@@ -107,10 +170,8 @@ export default function Login() {
             <span className="font-label-caps text-xs">Profile</span>
           </div>
         </nav>
-
-        {/* Botão inferior */}
         <div className="pb-1 mx-1">
-          <button className="w-full py-3 bg-cyan-500/10 border border-cyan-500/40 text-cyan-400 font-label-caps text-[10px] hover:bg-cyan-500 hover:text-slate-950 transition-all duration-300 tracking-[0.2em]">
+          <button className="w-full py-3 bg-cyan-500/10 border border-cyan-500/40 text-cyan-400 font-label-caps text-[10px] tracking-[0.2em]">
             OPTIMIZE SYSTEM
           </button>
         </div>
@@ -118,7 +179,7 @@ export default function Login() {
 
       {/* MAIN CONTENT */}
       <div className="flex-1 flex flex-col ml-64">
-        {/* TOP APP BAR - Idêntica ao App.jsx */}
+        {/* TOP APP BAR */}
         <header className="fixed top-0 right-0 left-64 h-16 flex justify-between items-center px-2 bg-slate-950/60 backdrop-blur-md border-b border-cyan-500/20 shadow-2xl shadow-cyan-900/20 z-40">
           <div className="flex items-center mx-2">
             <span className="text-lg font-bold text-white tracking-widest font-['Space_Grotesk']">FRAME_ANALYSIS_CMD</span>
@@ -135,9 +196,7 @@ export default function Login() {
             <span className="material-symbols-outlined text-slate-500 hover:text-cyan-400 cursor-pointer transition-colors">settings</span>
             <span className="material-symbols-outlined text-slate-500 hover:text-cyan-400 cursor-pointer transition-colors">terminal</span>
             <div className="flex items-center pl-5 border-l border-white/10">
-              <button className="px-6 h-10 text-slate-950 font-label-caps text-[10px] font-bold tracking-widest rounded hover:opacity-90 transition-opacity" style={{
-                backgroundImage: 'linear-gradient(to right, #06b6d4, #a855f7)'
-              }}>
+              <button className="px-6 h-10 text-slate-950 font-label-caps text-[10px] font-bold tracking-widest rounded transition-opacity" style={{ backgroundImage: 'linear-gradient(to right, #06b6d4, #a855f7)' }}>
                 LOGIN / JOIN
               </button>
             </div>
@@ -146,240 +205,188 @@ export default function Login() {
 
         {/* PAGE CONTENT */}
         <main className="fixed inset-0 top-16 overflow-y-auto relative z-10 flex items-center justify-center">
-          {/* BACKGROUND AESTHETIC */}
           <div className="fixed inset-0 z-0 pointer-events-none">
             <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-cyan-900/20 blur-[120px] rounded-full"></div>
             <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-900/10 blur-[120px] rounded-full"></div>
           </div>
 
-          {/* Login Module */}
           <div className="relative z-10 w-full max-w-md mx-auto">
-            <div className="glass-panel p-10 rounded-xl shadow-[0_0_50px_rgba(0,0,0,0.5)] border border-cyan-500/20">
-              {/* Panel Header */}
+            <div className="glass-panel p-10 rounded-xl shadow-[0_0_50px_rgba(0,0,0,0.5)] border border-cyan-500/20 transition-all duration-300">
+              
               <div className="mb-10 text-center">
-                <div className="inline-block px-3 py-1 mb-4 border border-cyan-500/30 bg-cyan-500/5 rounded text-[10px] font-label-caps text-cyan-400 uppercase tracking-[0.3em]">
-                  {step === 'login' ? 'Authorization Required' : 'Verification Code'}
+                <div className="inline-block px-3 py-1 mb-4 border border-cyan-500/30 bg-cyan-500/5 rounded text-[10px] font-label-caps text-cyan-400 uppercase tracking-[0.3em] transition-all">
+                  {getStepTitle()}
                 </div>
                 <h1 className="font-headline-lg text-primary-fixed mb-2 uppercase tracking-tighter">FPS_CORE</h1>
-                <p className="text-on-surface-variant text-sm font-body-md opacity-70">
-                  {step === 'login' 
-                    ? 'Initialize secure connection to global neural nodes.' 
-                    : 'Enter the verification code sent to your email.'}
+                <p className="text-on-surface-variant text-sm font-body-md opacity-70 min-h-[40px]">
+                  {getStepDescription()}
                 </p>
               </div>
 
-              {/* Error Message */}
+              {/* Status Messages estilizadas */}
               {error && (
-                <div className="mb-6 p-3 bg-red-900/20 border border-red-500/40 rounded">
-                  <p className="text-red-400 text-xs font-label-caps">{error}</p>
+                <div className="mb-6 p-4 bg-red-950/40 border-l-2 border-red-500/80 rounded-r shadow-[inset_10px_0_20px_-10px_rgba(239,68,68,0.2)]">
+                  <p className="text-red-400 text-xs font-label-caps tracking-widest">{error}</p>
                 </div>
               )}
-
-              {/* Success Message */}
               {success && (
-                <div className="mb-6 p-3 bg-green-900/20 border border-green-500/40 rounded">
-                  <p className="text-green-400 text-xs font-label-caps">{success}</p>
+                <div className="mb-6 p-4 bg-cyan-950/40 border-l-2 border-cyan-500/80 rounded-r shadow-[inset_10px_0_20px_-10px_rgba(6,182,212,0.2)]">
+                  <p className="text-cyan-400 text-xs font-label-caps tracking-widest leading-relaxed">{success}</p>
                 </div>
               )}
 
-              {/* Login Form */}
               <form onSubmit={handleSubmit} className="space-y-8">
-                {step === 'login' ? (
-                  <>
-                    {/* Email Field */}
-                    <div className="relative">
-                      <label className="font-label-caps text-[10px] text-cyan-400/80 mb-2 block uppercase tracking-widest">
-                        Operator Identity
-                      </label>
-                      <div className="flex items-center border-b border-cyan-500/30 focus-within:border-cyan-400 transition-colors bg-cyan-500/5 px-3 py-3">
-                        <span className="material-symbols-outlined text-cyan-400/60 mr-3">alternate_email</span>
-                        <input
-                          type="email"
-                          name="email"
-                          value={formData.email}
-                          onChange={handleChange}
-                          required
-                          className="bg-transparent border-none focus:ring-0 text-primary-fixed placeholder:text-cyan-900/50 w-full font-label-caps text-sm tracking-widest uppercase outline-none"
-                          placeholder="OPERATOR@CORE.SYS"
-                        />
-                      </div>
+                
+                {(step === 'login' || step === 'forgot_password') && (
+                  <div className="relative">
+                    <label className="font-label-caps text-[10px] text-cyan-400/80 mb-2 block uppercase tracking-widest">
+                      Operator Identity
+                    </label>
+                    <div className="flex items-center border-b border-cyan-500/30 focus-within:border-cyan-400 transition-colors bg-cyan-500/5 px-3 py-3">
+                      <span className="material-symbols-outlined text-cyan-400/60 mr-3">alternate_email</span>
+                      <input
+                        type="email"
+                        name="email"
+                        value={formData.email}
+                        onChange={handleChange}
+                        required
+                        className="bg-transparent border-none focus:ring-0 text-primary-fixed placeholder:text-cyan-900/50 w-full font-label-caps text-sm tracking-widest uppercase outline-none"
+                        placeholder="OPERATOR@CORE.SYS"
+                      />
                     </div>
-
-                    {/* Password Field */}
-                    <div className="relative">
-                      <label className="font-label-caps text-[10px] text-cyan-400/80 mb-2 block uppercase tracking-widest">
-                        Encrypted Keyphrase
-                      </label>
-                      <div className="flex items-center border-b border-cyan-500/30 focus-within:border-cyan-400 transition-colors bg-cyan-500/5 px-3 py-3">
-                        <span className="material-symbols-outlined text-cyan-400/60 mr-3">key</span>
-                        <input
-                          type={showPassword ? 'text' : 'password'}
-                          name="password"
-                          value={formData.password}
-                          onChange={handleChange}
-                          required
-                          className="bg-transparent border-none focus:ring-0 text-primary-fixed placeholder:text-cyan-900/50 w-full font-label-caps text-sm tracking-widest outline-none"
-                          placeholder="••••••••••••"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="material-symbols-outlined text-cyan-400/40 cursor-pointer hover:text-cyan-400 transition-colors"
-                        >
-                          {showPassword ? 'visibility_off' : 'visibility'}
-                        </button>
-                      </div>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    {/* Verification Code Field */}
-                    <div className="relative">
-                      <label className="font-label-caps text-[10px] text-cyan-400/80 mb-2 block uppercase tracking-widest">
-                        Verification Code
-                      </label>
-                      <div className="flex items-center border-b border-cyan-500/30 focus-within:border-cyan-400 transition-colors bg-cyan-500/5 px-3 py-3">
-                        <span className="material-symbols-outlined text-cyan-400/60 mr-3">verified_user</span>
-                        <input
-                          type="text"
-                          value={code}
-                          onChange={(e) => setCode(e.target.value)}
-                          required
-                          maxLength="6"
-                          className="bg-transparent border-none focus:ring-0 text-primary-fixed placeholder:text-cyan-900/50 w-full font-label-caps text-sm tracking-widest uppercase outline-none text-center text-2xl letter-spacing-[0.5em]"
-                          placeholder="000000"
-                        />
-                      </div>
-                      <p className="text-[9px] text-slate-500 mt-2">Código enviado para: {formData.email}</p>
-                    </div>
-                  </>
+                  </div>
                 )}
 
-                {/* Primary Action */}
-                <div className="pt-4">
+                {step === 'login' && (
+                  <div className="relative">
+                    <label className="font-label-caps text-[10px] text-cyan-400/80 mb-2 block uppercase tracking-widest">
+                      Encrypted Keyphrase
+                    </label>
+                    <div className="flex items-center border-b border-cyan-500/30 focus-within:border-cyan-400 transition-colors bg-cyan-500/5 px-3 py-3">
+                      <span className="material-symbols-outlined text-cyan-400/60 mr-3">key</span>
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        name="password"
+                        value={formData.password}
+                        onChange={handleChange}
+                        required
+                        className="bg-transparent border-none focus:ring-0 text-primary-fixed placeholder:text-cyan-900/50 w-full font-label-caps text-sm tracking-widest outline-none"
+                        placeholder="••••••••••••"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="material-symbols-outlined text-cyan-400/40 cursor-pointer hover:text-cyan-400 transition-colors"
+                      >
+                        {showPassword ? 'visibility_off' : 'visibility'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {(step === 'verify_code' || step === 'verify_reset_token') && (
+                  <div className="relative">
+                    <label className="font-label-caps text-[10px] text-cyan-400/80 mb-2 block uppercase tracking-widest">
+                      {step === 'verify_code' ? 'Access Token' : 'Recovery Token'}
+                    </label>
+                    <div className="flex items-center border-b border-cyan-500/30 focus-within:border-cyan-400 transition-colors bg-cyan-500/5 px-3 py-3">
+                      <span className="material-symbols-outlined text-cyan-400/60 mr-3">verified_user</span>
+                      <input
+                        type="text"
+                        value={code}
+                        onChange={(e) => setCode(e.target.value)}
+                        required
+                        maxLength={step === 'verify_code' ? "6" : undefined}
+                        className="bg-transparent border-none focus:ring-0 text-primary-fixed placeholder:text-cyan-900/50 w-full font-label-caps text-sm tracking-widest uppercase outline-none text-center text-xl md:text-2xl letter-spacing-[0.5em]"
+                        placeholder={step === 'verify_code' ? "000000" : "PASTE TOKEN HERE"}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {step === 'new_password' && (
+                  <div className="relative">
+                    <label className="font-label-caps text-[10px] text-cyan-400/80 mb-2 block uppercase tracking-widest">
+                      New Encrypted Keyphrase
+                    </label>
+                    <div className="flex items-center border-b border-cyan-500/30 focus-within:border-cyan-400 transition-colors bg-cyan-500/5 px-3 py-3">
+                      <span className="material-symbols-outlined text-cyan-400/60 mr-3">key</span>
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        name="newPassword"
+                        value={formData.newPassword}
+                        onChange={handleChange}
+                        required
+                        className="bg-transparent border-none focus:ring-0 text-primary-fixed placeholder:text-cyan-900/50 w-full font-label-caps text-sm tracking-widest outline-none"
+                        placeholder="NEW ••••••••••••"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="material-symbols-outlined text-cyan-400/40 cursor-pointer hover:text-cyan-400 transition-colors"
+                      >
+                        {showPassword ? 'visibility_off' : 'visibility'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                <div className="pt-4 space-y-4">
                   <button
                     type="submit"
                     disabled={isLoading}
+                    className="flex items-center justify-center w-full h-14 font-['Space_Grotesk'] text-sm font-black uppercase tracking-[0.2em] rounded border-none transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed text-slate-950"
                     style={{
-                      backgroundImage: isLoading ? 'linear-gradient(to right, #00f0ff, #b600f8)' : 'linear-gradient(to right, #00f0ff, #b600f8)',
-                      color: '#0f172a',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      width: '100%',
-                      height: '3.5rem',
-                      fontFamily: 'Space Grotesk, sans-serif',
-                      fontSize: '14px',
-                      fontWeight: '900',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.2em',
+                      backgroundImage: 'linear-gradient(to right, #00f0ff, #b600f8)',
                       boxShadow: isLoading ? '0 0 20px rgba(0,240,255,0.2)' : '0 0 20px rgba(0,240,255,0.4)',
-                      border: 'none',
-                      borderRadius: '4px',
-                      cursor: isLoading ? 'not-allowed' : 'pointer',
-                      opacity: isLoading ? 0.5 : 1,
-                      transform: isLoading ? 'scale(1)' : 'scale(1)',
-                      transition: 'all 300ms ease'
                     }}
-                    onMouseDown={(e) => !isLoading && (e.currentTarget.style.transform = 'scale(0.98)')}
-                    onMouseUp={(e) => !isLoading && (e.currentTarget.style.transform = 'scale(1)')}
                   >
-                    {isLoading 
-                      ? 'INITIALIZING...' 
-                      : step === 'login' 
-                        ? 'INITIATE NEURAL LINK' 
-                        : 'VERIFY CODE'}
+                    {isLoading ? 'PROCESSING...' : 
+                     step === 'login' ? 'INITIATE NEURAL LINK' :
+                     step === 'verify_code' ? 'VERIFY ACCESS CODE' :
+                     step === 'forgot_password' ? 'DISPATCH RECOVERY CIPHER' :
+                     step === 'verify_reset_token' ? 'VALIDATE CIPHER' :
+                     'ENCRYPT NEW KEYPHRASE'
+                    }
                   </button>
-                </div>
 
-                {/* Back Button (for verification step) */}
-                {step === 'verify_code' && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setStep('login');
-                      setCode('');
-                      setError('');
-                      setSuccess('');
-                    }}
-                    className="w-full py-2 text-cyan-400 hover:text-cyan-300 font-label-caps text-[10px] uppercase transition-colors"
-                  >
-                    ← Back to Login
-                  </button>
-                )}
+                  {step !== 'login' && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setStep('login');
+                        setCode('');
+                        handleResetState();
+                      }}
+                      className="w-full py-2 text-cyan-400/70 hover:text-cyan-300 font-label-caps text-[10px] uppercase transition-colors"
+                    >
+                      ← Abort Protocol & Return
+                    </button>
+                  )}
+                </div>
               </form>
 
-              {/* Footer Links */}
-              <div className="mt-8 flex justify-between items-center text-[10px] font-label-caps tracking-widest">
-                <button
-                  onClick={handleForgotPassword}
-                  className="text-on-surface-variant hover:text-cyan-400 transition-colors uppercase bg-none border-none cursor-pointer"
-                >
-                  Forgot Credentials
-                </button>
-                <div className="h-px w-8 bg-cyan-500/20"></div>
-                <Link
-                  to="/signup"
-                  className="text-on-surface-variant hover:text-cyan-400 transition-colors uppercase underline decoration-cyan-500/40 underline-offset-4"
-                >
-                  Sign In
-                </Link>
-              </div>
-            </div>
-
-            {/* Visual Decoration Stats */}
-            <div className="absolute -bottom-16 left-0 right-0 flex justify-between items-center px-4 opacity-40">
-              <div className="flex flex-col">
-                <span className="text-[8px] font-label-caps text-slate-500 uppercase">Latency</span>
-                <span className="text-xs font-data-display text-cyan-400">--</span>
-              </div>
-              <div className="flex flex-col text-center">
-                <span className="text-[8px] font-label-caps text-slate-500 uppercase">Server Status</span>
-                <span className="text-xs font-data-display text-slate-500">LOCKED</span>
-              </div>
-              <div className="flex flex-col text-right">
-                <span className="text-[8px] font-label-caps text-slate-500 uppercase">Node ID</span>
-                <span className="text-xs font-data-display text-slate-400">--</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Right Side HUD Element */}
-          <div className="absolute right-10 top-1/2 -translate-y-1/2 hidden xl:block w-48 space-y-4 opacity-40">
-            <div className="glass-panel p-4 border-l-2 border-l-cyan-400">
-              <div className="text-[9px] font-label-caps text-cyan-400/60 mb-1">SYSTEM LOAD</div>
-              <div className="h-1 bg-slate-800 rounded-full overflow-hidden">
-                <div className="h-full bg-cyan-400 w-0"></div>
-              </div>
-            </div>
-            <div className="glass-panel p-4 border-l-2 border-l-slate-600">
-              <div className="text-[9px] font-label-caps text-slate-500 mb-1">NETWORK STABILITY</div>
-              <div className="flex gap-1">
-                <div className="h-3 w-1 bg-slate-600"></div>
-                <div className="h-3 w-1 bg-slate-600"></div>
-                <div className="h-3 w-1 bg-slate-600"></div>
-                <div className="h-3 w-1 bg-slate-600"></div>
-                <div className="h-3 w-1 bg-slate-800"></div>
-              </div>
+              {step === 'login' && (
+                <div className="mt-8 flex justify-between items-center text-[10px] font-label-caps tracking-widest">
+                  <button
+                    type="button"
+                    onClick={() => setStep('forgot_password')}
+                    className="text-on-surface-variant hover:text-cyan-400 transition-colors uppercase bg-transparent border-none cursor-pointer p-0"
+                  >
+                    Forgot Credentials
+                  </button>
+                  <div className="h-px w-8 bg-cyan-500/20"></div>
+                  <Link
+                    to="/signup"
+                    className="text-on-surface-variant hover:text-cyan-400 transition-colors uppercase underline decoration-cyan-500/40 underline-offset-4"
+                  >
+                    Register New Identity
+                  </Link>
+                </div>
+              )}
             </div>
           </div>
         </main>
-
-        {/* BOTTOM STATUS BAR - Idêntica ao App.jsx mas desativada */}
-        <footer className="fixed bottom-0 right-0 left-64 h-8 bg-slate-900/80 backdrop-blur-sm border-t border-white/5 z-40 flex items-center justify-between px-8 opacity-40 pointer-events-none">
-          <div className="flex items-center gap-4 ml-2">
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-slate-600"></span>
-              <span className="font-label-caps text-[9px] text-slate-400">DATABASE_SYNC: LOCKED</span>
-            </div>
-            <span className="font-label-caps text-[9px] text-slate-600">|</span>
-            <span className="font-label-caps text-[9px] text-slate-400">LATENCY: --MS</span>
-          </div>
-          <div className="flex items-center gap-4 mr-2">
-            <span className="font-label-caps text-[9px] text-slate-400">ENCRYPTION: AES-256</span>
-            <span className="font-label-caps text-[9px] text-slate-500">USER: --</span>
-          </div>
-        </footer>
       </div>
     </div>
   );

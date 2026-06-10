@@ -1,15 +1,18 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import DashboardGrid from '../components/DashboardGrid';
 import GlassCard from '../components/GlassCard';
 import { HardwareSearchInput } from '../components/HardwareSearchInput';
 import * as llmAPI from '../api/llm';
+import * as userAPI from '../api/user';
+import * as gamesAPI from '../api/games'; // Importação para salvar o jogo
 import { useGameSearch } from '../hooks/useGameSearch';
 import { useCpuSearch, useGpuSearch } from '../hooks/useHardwareSearch';
 import { filterRamOptions } from '../utils/filterRam';
 
 export default function Estimate() {
-  // State para formulário
   const [selectedGame, setSelectedGame] = useState('');
+  const [selectedGameId, setSelectedGameId] = useState(''); // State para o UUID do jogo
+  const [selectedGameImage, setSelectedGameImage] = useState(null);
   const [selectedPreset, setSelectedPreset] = useState('HIGH');
   const [selectedResolution, setSelectedResolution] = useState('1440P');
   const [selectedGPU, setSelectedGPU] = useState('');
@@ -20,33 +23,33 @@ export default function Estimate() {
   const [gpuSearch, setGpuSearch] = useState('');
   const [ramSearch, setRamSearch] = useState('');
 
+  useEffect(() => {
+    const loadUserHardware = async () => {
+      try {
+        const user = await userAPI.get_current_user();
+        if (user) {
+          if (user.cpu) setSelectedCPU(user.cpu);
+          if (user.gpu) setSelectedGPU(user.gpu);
+          if (user.ram) setSelectedRAM(user.ram);
+        }
+      } catch (err) {
+        console.log("Hardware prévio não carregado (Guest ou não logado).");
+      }
+    };
+
+    loadUserHardware();
+  }, []); 
+
   const [rams] = useState([
-    '128GB DDR5',
-    '64GB DDR5',
-    '32GB DDR5',
-    '16GB DDR5',
-    '8GB DDR5',
-    '4GB DDR5',
-    '128GB DDR4',
-    '64GB DDR4',
-    '32GB DDR4',
-    '16GB DDR4',
-    '8GB DDR4',
-    '4GB DDR4',
-    '128GB DDR3',
-    '64GB DDR3',
-    '32GB DDR3',
-    '16GB DDR3',
-    '8GB DDR3',
-    '4GB DDR3',
+    '128GB DDR5', '64GB DDR5', '32GB DDR5', '16GB DDR5', '8GB DDR5', '4GB DDR5',
+    '128GB DDR4', '64GB DDR4', '32GB DDR4', '16GB DDR4', '8GB DDR4', '4GB DDR4',
+    '128GB DDR3', '64GB DDR3', '32GB DDR3', '16GB DDR3', '8GB DDR3', '4GB DDR3',
   ]);
 
-  // State para resultado
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // State para histórico
   const [recentEstimates, setRecentEstimates] = useState([
     {
       id: 1,
@@ -62,13 +65,6 @@ export default function Estimate() {
       fps: 60,
       color: 'secondary',
     },
-    {
-      id: 3,
-      name: 'Baldurs Gate 3',
-      specs: '1080p • RTX 4090 • Ultra',
-      fps: 178,
-      color: 'cyan',
-    },
   ]);
 
   const { results: gameSearchResults, loading: gameSearchLoading } = useGameSearch(gameSearch, 10);
@@ -80,8 +76,8 @@ export default function Estimate() {
   const handleEstimate = async (e) => {
     e.preventDefault();
 
-    if (!selectedGame || !selectedGPU || !selectedCPU || !selectedRAM) {
-      setError('Preencha todos os campos obrigatórios');
+    if (!selectedGame || !selectedGameId || !selectedGPU || !selectedCPU || !selectedRAM) {
+      setError('SYSTEM_WARNING: Preencha todos os dados de telemetria e selecione o jogo da lista.');
       return;
     }
 
@@ -100,23 +96,39 @@ export default function Estimate() {
         ram: selectedRAM,
       };
 
+      // 1. Calcula o FPS usando a API
       const data = await llmAPI.estimate_fps(estimateData);
       setResult(data);
 
-      // Adicionar ao histórico
+      // 2. Tenta salvar o resultado na Neural Library do usuário
+      try {
+        await gamesAPI.add_user_game({
+          game_name: selectedGame,
+          game_id: selectedGameId, // Enviando o UUID obrigatório
+          preset: selectedPreset,
+          resolution: selectedResolution,
+          upscaling: 'DLSS',
+          avg_fps: Math.round(data.avg_fps), // Convertendo para integer conforme o DB
+          min_fps: Math.round(data.min_fps),
+          max_fps: Math.round(data.max_fps)
+        });
+      } catch (saveErr) {
+        console.error("Erro ao salvar na biblioteca:", saveErr.response?.data || saveErr.message);
+      }
+
+      // 3. Atualiza o histórico visual da sessão atual
       setRecentEstimates((prev) => [
         {
           id: Date.now(),
           name: selectedGame,
-          specs: `${selectedResolution} • ${selectedGPU.split(' ')[selectedGPU.split(' ').length - 1]} • ${selectedPreset}`,
-          fps: data.avg_fps || 0,
+          specs: `${selectedResolution} • ${selectedGPU.split(' ').pop()} • ${selectedPreset}`,
+          fps: Math.round(data.avg_fps) || 0,
           color: 'cyan',
         },
         ...prev.slice(0, 2),
       ]);
     } catch (err) {
-      setError(err.message || 'Erro ao processar estimativa');
-      console.error(err);
+      setError(err.message || 'Erro na comunicação com a API de predição.');
     } finally {
       setLoading(false);
     }
@@ -141,46 +153,52 @@ export default function Estimate() {
       </div>
 
       <DashboardGrid>
-        {/* LINE 1 */}
-        <div className="grid-span-6">
-          <GlassCard title="ESTIMATED_FPS" className="relative overflow-hidden h-full">
+        {/* RESULTADO DA ESTIMATIVA (Ocupa 4 colunas na esquerda) */}
+        <div className="col-span-12 lg:col-span-4">
+          <GlassCard title="ESTIMATED_FPS" className="relative h-full">
             <div className="absolute top-0 left-0 w-1 h-full bg-cyan-500"></div>
+            
             {result ? (
-              <div className="flex flex-col gap-6 h-full justify-center">
-                <div className="flex items-baseline gap-3">
-                  <span className="data-display text-cyan-400">{result.avg_fps || 0}</span>
-                  <span className="text-sm text-slate-400">AVG</span>
+              <div className="flex flex-col gap-6 h-full justify-center p-4">
+                <div className="flex items-baseline gap-3 justify-center mb-4">
+                  <span className="text-6xl font-data-display text-cyan-400">{Math.round(result.avg_fps)}</span>
+                  <span className="text-sm font-label-caps text-slate-400">AVG_FPS</span>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="font-label-caps text-[11px] text-slate-500 mb-2">MIN</p>
-                    <span className="text-2xl font-bold text-slate-300">{result.min_fps || 0}</span>
+                
+                <div className="grid grid-cols-2 gap-4 border-t border-white/10 pt-6">
+                  <div className="text-center">
+                    <p className="font-label-caps text-[11px] text-slate-500 mb-2">1% LOW (MIN)</p>
+                    <span className="text-3xl font-bold text-slate-300">{Math.round(result.min_fps)}</span>
                   </div>
-                  <div>
-                    <p className="font-label-caps text-[11px] text-slate-500 mb-2">MAX</p>
-                    <span className="text-2xl font-bold text-secondary">{result.max_fps || 0}</span>
+                  <div className="text-center border-l border-white/10">
+                    <p className="font-label-caps text-[11px] text-slate-500 mb-2">PEAK (MAX)</p>
+                    <span className="text-3xl font-bold text-secondary">{Math.round(result.max_fps)}</span>
                   </div>
                 </div>
               </div>
             ) : (
-              <div className="flex flex-col items-center justify-center h-full gap-4 text-center">
-                <span className="material-symbols-outlined text-4xl text-slate-600">insights</span>
-                <p className="text-sm text-slate-400">Configure sua máquina e clique em ESTIMATE PERFORMANCE para ver os resultados.</p>
+              <div className="flex flex-col items-center justify-center h-full gap-4 text-center p-8 opacity-50">
+                <span className="material-symbols-outlined text-5xl text-slate-500 mb-2">network_node</span>
+                <p className="text-xs font-label-caps text-slate-400 tracking-widest leading-relaxed">
+                  AWAITING HARDWARE <br/> TELEMETRY DATA...
+                </p>
               </div>
             )}
           </GlassCard>
         </div>
 
-        <div className="grid-span-6">
-          <GlassCard title="HARDWARE_SPECIFICATIONS" className="relative overflow-hidden">
+        {/* BENTO INPUT FORM (Ocupa 8 colunas na direita) */}
+        <div className="col-span-12 lg:col-span-8">
+          <GlassCard title="HARDWARE_SPECIFICATIONS" className="relative">
             <div className="absolute top-0 left-0 w-1 h-full bg-cyan-500"></div>
-            <form onSubmit={handleEstimate} className="grid grid-cols-1 md:grid-cols-2 gap-unit-8">
-              {/* Game Selection */}
+            <form onSubmit={handleEstimate} className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              
+              {/* Game Selection (COM CAPAS) */}
               <div className="col-span-1 md:col-span-2">
                 <label className="block font-label-caps text-[12px] text-cyan-500 mb-2">
                   TARGET_GAME_IDENTIFIER
                 </label>
-                <div className="relative">
+                <div className="relative z-50">
                   <input
                     type="text"
                     placeholder="e.g., Cyberpunk 2077, Elden Ring..."
@@ -188,33 +206,59 @@ export default function Estimate() {
                     onChange={(e) => setGameSearch(e.target.value)}
                     className="w-full bg-transparent border-b border-white/20 focus:border-cyan-400 py-3 text-white font-body-md outline-none transition-all placeholder:text-slate-600"
                   />
-                  {/* Dropdown de jogos */}
-                  {gameSearchLoading && (
-                    <p className="text-xs text-slate-500 mt-2">Buscando jogos...</p>
-                  )}
+                  {gameSearchLoading && <p className="text-xs text-slate-500 mt-2">Buscando na database...</p>}
+                  
+                  {/* DROPDOWN COM IMAGENS */}
                   {gameSearch && !gameSearchLoading && gameSearchResults.length > 0 && (
-                    <div className="absolute top-full left-0 right-0 bg-slate-900 border border-cyan-500/40 rounded mt-2 max-h-64 overflow-y-auto z-50">
+                    <div className="absolute top-full left-0 right-0 bg-slate-900 border border-cyan-500/40 rounded mt-2 max-h-64 overflow-y-auto z-50 shadow-2xl">
                       {gameSearchResults.map((game) => (
                         <button
                           key={game.id}
                           type="button"
-                          onClick={() => {
-                            setSelectedGame(game.name);
-                            setGameSearch('');
+                          onClick={() => { 
+                            setSelectedGame(game.name); 
+                            setSelectedGameId(game.id); // Guardando o ID único
+                            setSelectedGameImage(game.image_url);
+                            setGameSearch(''); 
                           }}
-                          className="w-full px-4 py-2 text-left text-cyan-300 hover:bg-cyan-500/30 hover:text-cyan-100 transition-colors text-sm"
+                          className="w-full px-4 py-2 text-left hover:bg-cyan-500/20 transition-colors border-b border-white/5 flex items-center gap-3 group"
                         >
-                          {game.name}
+                          {game.image_url ? (
+                            <img src={game.image_url} alt={game.name} className="w-8 h-10 object-cover rounded opacity-80 group-hover:opacity-100" />
+                          ) : (
+                            <div className="w-8 h-10 bg-slate-800 rounded flex items-center justify-center">
+                              <span className="material-symbols-outlined text-[16px] text-slate-500">image</span>
+                            </div>
+                          )}
+                          <span className="text-sm text-cyan-300 group-hover:text-cyan-100">{game.name}</span>
                         </button>
                       ))}
                     </div>
                   )}
-                  {gameSearch && !gameSearchLoading && gameSearchResults.length === 0 && (
-                    <p className="text-xs text-slate-500 mt-2">Nenhum jogo encontrado.</p>
-                  )}
                 </div>
+
+                {/* CARTÃO DO JOGO SELECIONADO */}
                 {selectedGame && (
-                  <p className="text-xs text-cyan-400 mt-2">Selecionado: {selectedGame}</p>
+                  <div className="mt-4 flex items-center gap-4 p-4 bg-slate-900/50 border border-cyan-500/30 rounded-lg">
+                    {selectedGameImage ? (
+                      <img 
+                        src={selectedGameImage} 
+                        alt={selectedGame} 
+                        className="w-14 h-20 object-cover rounded shadow-[0_0_15px_rgba(0,240,255,0.2)]" 
+                      />
+                    ) : (
+                      <div className="w-14 h-20 bg-slate-800 rounded border border-white/10 flex items-center justify-center">
+                        <span className="material-symbols-outlined text-slate-500">sports_esports</span>
+                      </div>
+                    )}
+                    <div>
+                      <p className="font-label-caps text-[10px] text-cyan-500 mb-1 flex items-center gap-1">
+                        <span className="material-symbols-outlined text-[12px]">check_circle</span>
+                        SELECTED_TARGET
+                      </p>
+                      <p className="font-headline-md text-white">{selectedGame}</p>
+                    </div>
+                  </div>
                 )}
               </div>
 
@@ -264,59 +308,50 @@ export default function Estimate() {
                 </div>
               </div>
 
+              {/* CPU e GPU Components */}
               <HardwareSearchInput
                 label="PROCESSOR_UNIT (CPU)"
-                placeholder="Buscar CPU..."
+                placeholder="Buscar modelo de CPU..."
                 search={cpuSearch}
                 onSearchChange={setCpuSearch}
                 results={cpuSearchResults}
                 loading={cpuSearchLoading}
                 selected={selectedCPU}
-                onSelect={(name) => {
-                  setSelectedCPU(name);
-                  setCpuSearch('');
-                }}
+                onSelect={(name) => { setSelectedCPU(name); setCpuSearch(''); }}
               />
 
               <HardwareSearchInput
                 label="GRAPHICS_UNIT (GPU)"
-                placeholder="Buscar GPU..."
+                placeholder="Buscar modelo de GPU..."
                 search={gpuSearch}
                 onSearchChange={setGpuSearch}
                 results={gpuSearchResults}
                 loading={gpuSearchLoading}
                 selected={selectedGPU}
-                onSelect={(name) => {
-                  setSelectedGPU(name);
-                  setGpuSearch('');
-                }}
+                onSelect={(name) => { setSelectedGPU(name); setGpuSearch(''); }}
               />
 
               {/* Memory */}
-              <div>
+              <div className="col-span-1 md:col-span-2">
                 <label className="block font-label-caps text-[12px] text-cyan-500 mb-2">
                   SYSTEM_MEMORY (RAM)
                 </label>
                 <div className="relative">
                   <input
                     type="text"
-                    placeholder="Buscar RAM..."
+                    placeholder="Buscar capacidade e tipo..."
                     value={ramSearch}
                     onChange={(e) => setRamSearch(e.target.value)}
-                    className="w-full bg-transparent border-b border-white/20 focus:border-cyan-400 py-3 px-0 text-white font-body-md outline-none transition-all placeholder:text-slate-600"
+                    className="w-full bg-transparent border-b border-white/20 focus:border-cyan-400 py-3 text-white font-body-md outline-none transition-all placeholder:text-slate-600"
                   />
-                  {/* Dropdown de RAMs */}
                   {ramSearch && filteredRams.length > 0 && (
                     <div className="absolute top-full left-0 right-0 bg-slate-900 border border-cyan-500/40 rounded mt-2 max-h-48 overflow-y-auto z-50">
                       {filteredRams.map((ram) => (
                         <button
                           key={ram}
                           type="button"
-                          onClick={() => {
-                            setSelectedRAM(ram);
-                            setRamSearch('');
-                          }}
-                          className="w-full px-4 py-2 text-left text-cyan-300 hover:bg-cyan-500/30 hover:text-cyan-100 transition-colors text-sm"
+                          onClick={() => { setSelectedRAM(ram); setRamSearch(''); }}
+                          className="w-full px-4 py-3 text-left text-cyan-300 hover:bg-cyan-500/30 hover:text-cyan-100 transition-colors text-sm border-b border-white/5"
                         >
                           {ram}
                         </button>
@@ -324,50 +359,45 @@ export default function Estimate() {
                     </div>
                   )}
                 </div>
-                {selectedRAM && (
-                  <p className="text-xs text-cyan-400 mt-2">Selecionado: {selectedRAM}</p>
-                )}
+                {selectedRAM && <p className="text-xs font-label-caps text-cyan-400 mt-3">✓ {selectedRAM}</p>}
               </div>
 
               {/* Error Message */}
               {error && (
-                <div className="col-span-1 md:col-span-2 p-4 bg-red-900/20 border border-red-500/40 rounded text-red-400 text-sm">
+                <div className="col-span-1 md:col-span-2 p-4 bg-red-900/20 border border-red-500/40 rounded text-red-400 text-sm font-label-caps">
                   {error}
                 </div>
               )}
 
               {/* CTA Button */}
-              <div className="col-span-1 md:col-span-2 pt-2">
+              <div className="col-span-1 md:col-span-2 pt-4">
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full h-12 bg-gradient-to-r from-cyan-400 to-secondary text-slate-950 font-label-caps text-sm font-bold tracking-[0.3em] rounded transition-transform active:scale-[0.98] shadow-[0_0_30px_rgba(0,240,255,0.3)] disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full h-14 bg-gradient-to-r from-cyan-400 to-secondary text-slate-950 font-label-caps text-sm font-bold tracking-[0.3em] rounded transition-transform active:scale-[0.98] shadow-[0_0_30px_rgba(0,240,255,0.3)] disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {loading ? 'ESTIMATING...' : 'ESTIMATE PERFORMANCE'}
+                  {loading ? 'CALCULATING TELEMETRY...' : 'ESTIMATE PERFORMANCE'}
                 </button>
               </div>
             </form>
           </GlassCard>
         </div>
 
-        {/* LINE 2 */}
-        <div className="grid-span-12">
-          <GlassCard title="RECENT_ANALYSIS">
-            <div className="flex flex-col gap-4">
+        {/* HISTÓRICO DE ANÁLISES */}
+        <div className="col-span-12">
+          <GlassCard title="RECENT_ANALYSIS_LOG">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {recentEstimates.map((est) => (
-                <div key={est.id} className="flex items-center justify-between gap-6">
+                <div key={est.id} className="bg-slate-900/50 p-6 rounded border border-white/5 flex items-center justify-between">
                   <div>
-                    <p className="font-label-caps text-[12px] text-[color:var(--text-muted)] mb-1">
-                      RECENT_ANALYSIS_{String(est.id % 3 || 3).padStart(2, '0')}
-                    </p>
-                    <h4 className="text-[color:var(--text-primary)] font-headline-md mb-1">{est.name}</h4>
-                    <p className="text-xs text-[color:var(--text-muted)]">{est.specs}</p>
+                    <h4 className="text-white font-headline-md mb-1">{est.name}</h4>
+                    <p className="text-xs text-slate-400">{est.specs}</p>
                   </div>
                   <div className="text-right">
-                    <span className="data-display" style={{ color: est.color === 'secondary' ? 'var(--secondary-violet)' : 'var(--primary-cyan)' }}>
+                    <span className="text-3xl font-data-display" style={{ color: est.color === 'secondary' ? 'var(--secondary-violet, #b600f8)' : '#00dbe9' }}>
                       {est.fps}
                     </span>
-                    <span className="font-label-caps text-[12px] text-[color:var(--text-muted)] ml-2">FPS</span>
+                    <span className="font-label-caps text-[10px] text-slate-500 ml-1">FPS</span>
                   </div>
                 </div>
               ))}
