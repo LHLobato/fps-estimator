@@ -12,7 +12,7 @@ const RAM_OPTIONS = [
 ];
 
 export default function SignUp() {
-  const [step, setStep] = useState('register'); // 'register' ou 'verify_code'
+  const [step, setStep] = useState('register');
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -65,18 +65,15 @@ export default function SignUp() {
   };
 
   const getErrorMessage = (error) => {
-    // Se for array de erros de validação (422)
     if (Array.isArray(error.response?.data?.detail)) {
       return error.response.data.detail[0]?.msg || 'Validation error';
     }
-    // Se for objeto com detail
     if (error.response?.data?.detail) {
       if (typeof error.response.data.detail === 'string') {
         return error.response.data.detail;
       }
       return JSON.stringify(error.response.data.detail);
     }
-    // Fallback
     return error.message || 'Error creating account';
   };
 
@@ -86,10 +83,8 @@ export default function SignUp() {
     setSuccess('');
 
     if (step === 'register') {
-      // Validar formulário
       if (!validateForm()) return;
 
-      // Etapa 1: Criar conta e enviar OTP
       setIsLoading(true);
       try {
         const response = await authAPI.sign_in({
@@ -110,7 +105,6 @@ export default function SignUp() {
         setIsLoading(false);
       }
     } else if (step === 'verify_code') {
-      // Etapa 2: Verificar código
       setIsLoading(true);
       try {
         const response = await authAPI.verify_code_sign({
@@ -118,17 +112,14 @@ export default function SignUp() {
           code
         });
 
-        // Salvar tokens
         localStorage.setItem('access_token', response.access_token);
         if (response.refresh_token) {
           localStorage.setItem('refresh_token', response.refresh_token);
         }
 
-        setSuccess('Conta criada com sucesso! Redirecionando...');
+        setSuccess('Account created successfully! Redirecting...');
         
-        // Aguardar um pouco e depois redirecionar
         setTimeout(() => {
-          // Recarregar a página para forçar atualização do useAuth
           window.location.href = '/';
         }, 800);
       } catch (err) {
@@ -142,7 +133,7 @@ export default function SignUp() {
 
   return (
     <div className="flex h-screen bg-slate-950">
-      {/* SIDEBAR - Idêntica ao App.jsx mas desativada */}
+      {/* SIDEBAR - Identical to App.jsx but disabled */}
       <aside className="fixed left-0 top-0 h-full w-64 border-r border-cyan-500/30 bg-slate-950/40 backdrop-blur-xl shadow-[20px_0_40px_-15px_rgba(0,0,0,0.5)] z-50 flex flex-col opacity-40 pointer-events-none">
         {/* Logo */}
         <div className="px-2 pt-2 mx-2">
@@ -168,7 +159,7 @@ export default function SignUp() {
           </div>
         </nav>
 
-        {/* Botão inferior */}
+        {/* Bottom button */}
         <div className="pb-1 mx-1">
           <button className="w-full py-3 bg-cyan-500/10 border border-cyan-500/40 text-cyan-400 font-label-caps text-[10px] hover:bg-cyan-500 hover:text-slate-950 transition-all duration-300 tracking-[0.2em]">
             OPTIMIZE SYSTEM
@@ -178,7 +169,7 @@ export default function SignUp() {
 
       {/* MAIN CONTENT */}
       <div className="flex-1 flex flex-col ml-64">
-        {/* TOP APP BAR - Idêntica ao App.jsx */}
+        {/* TOP APP BAR - Identical to App.jsx */}
         <header className="fixed top-0 right-0 left-64 h-16 flex justify-between items-center px-2 bg-slate-950/60 backdrop-blur-md border-b border-cyan-500/20 shadow-2xl shadow-cyan-900/20 z-40">
           <div className="flex items-center mx-2">
             <span className="text-lg font-bold text-white tracking-widest font-['Space_Grotesk']">FRAME_ANALYSIS_CMD</span>
@@ -344,7 +335,7 @@ export default function SignUp() {
 
                       <HardwareSearchInput
                         label="Processor Unit (CPU)"
-                        placeholder="Buscar CPU..."
+                        placeholder="Search CPU..."
                         search={cpuSearch}
                         onSearchChange={setCpuSearch}
                         results={cpuSearchResults}
@@ -358,7 +349,7 @@ export default function SignUp() {
 
                       <HardwareSearchInput
                         label="Graphics Unit (GPU)"
-                        placeholder="Buscar GPU..."
+                        placeholder="Search GPU..."
                         search={gpuSearch}
                         onSearchChange={setGpuSearch}
                         results={gpuSearchResults}
@@ -376,7 +367,7 @@ export default function SignUp() {
                         </label>
                         <input
                           type="text"
-                          placeholder="Buscar RAM..."
+                          placeholder="Search RAM..."
                           value={ramSearch}
                           onChange={(e) => setRamSearch(e.target.value)}
                           className="w-full bg-transparent border-b border-cyan-500/30 focus:border-cyan-400 py-2 text-primary-fixed font-label-caps text-sm outline-none transition-all placeholder:text-cyan-900/50"
@@ -399,7 +390,7 @@ export default function SignUp() {
                           </div>
                         )}
                         {formData.ram && (
-                          <p className="text-[9px] text-cyan-400 mt-2">Selecionado: {formData.ram}</p>
+                          <p className="text-[9px] text-cyan-400 mt-2">Selected: {formData.ram}</p>
                         )}
                       </div>
                     </div>

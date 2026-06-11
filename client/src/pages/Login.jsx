@@ -5,7 +5,6 @@ import * as authAPI from '../api/auth';
 export default function Login() {
   const navigate = useNavigate();
   
-  // 'login', 'verify_code', 'forgot_password', 'verify_reset_token', 'new_password'
   const [step, setStep] = useState('login'); 
   
   const [formData, setFormData] = useState({
@@ -63,7 +62,6 @@ export default function Login() {
           localStorage.setItem('refresh_token', response.refresh_token);
         }
 
-        // Mensagem imersiva de sucesso
         setSuccess('AUTHORIZATION_ACCEPTED: Initializing neural network parameters...');
         
         setTimeout(() => {
@@ -101,13 +99,11 @@ export default function Login() {
     else if (step === 'new_password') {
       setIsLoading(true);
       try {
-        // Envia a nova senha e o token guardado no state 'code'
         await authAPI.reset_password({
           reset_token: code,
           new_password: formData.newPassword
         });
         
-        // Mensagem mais bonita e suave ao finalizar o reset
         setSuccess('KEYPHRASE_OVERRIDE_SUCCESSFUL. Systems re-secured. Standby for login routing...');
         
         setTimeout(() => {

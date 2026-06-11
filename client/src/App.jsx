@@ -77,12 +77,6 @@ function AppLayout() {
             </span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="relative group">
-              <span className="material-symbols-outlined text-slate-500 group-hover:text-cyan-400 cursor-pointer transition-colors">notifications</span>
-              <div className="absolute -top-1 -right-1 w-2 h-2 bg-secondary rounded-full"></div>
-            </div>
-            <span className="material-symbols-outlined text-slate-500 hover:text-cyan-400 cursor-pointer transition-colors">settings</span>
-            <span className="material-symbols-outlined text-slate-500 hover:text-cyan-400 cursor-pointer transition-colors">terminal</span>
             <div className="flex items-center pl-5 border-l border-white/10">
               <button 
                 onClick={handleLogout}
@@ -125,7 +119,9 @@ function AppLayout() {
           </div>
           <div className="flex items-center gap-4 mr-2">
             <span className="font-label-caps text-[9px] text-slate-400">ENCRYPTION: AES-256</span>
-            <span className="font-label-caps text-[9px] text-cyan-500">USER: GUEST_0821</span>
+            <span className="font-label-caps text-[9px] text-cyan-500">
+              USER: {user?.name ? user.name.toUpperCase() : (user?.email ? user.email.split('@')[0].toUpperCase() : 'GUEST')}
+            </span>
           </div>
         </footer>
       </div>

@@ -1,14 +1,16 @@
 import os
+from time import timezone
 from dotenv import load_dotenv
 from sqlalchemy import (
     Boolean, Column, Float, ForeignKey,
-    Integer, String, create_engine,
+    Integer, String, create_engine, DateTime
 )
 import uuid
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import declarative_base, relationship
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import text
+from datetime import datetime
 
 load_dotenv()
 
@@ -114,6 +116,7 @@ class GameUser(Base):
     preset     = Column(String)
     resolution = Column(String)
     upscaling  = Column(String)
+    updated_at  = Column(DateTime, default=datetime.utcnow)
 
     user = relationship("Users", back_populates="game_users")
     game = relationship("Game", back_populates="game_users")

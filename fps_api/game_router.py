@@ -3,6 +3,7 @@ from fastapi import APIRouter, Request, HTTPException, Depends
 from fps_api.limiter import limiter
 from fps_api.dependencies import get_session, get_current_user_id
 from fps_api.schemas import (
+    AddGameUserSchema,
     GameSchema,
     GameListSchema,
     GameInfoSchema,
@@ -22,34 +23,63 @@ async def list_games(request:Request, session:Session=Depends(get_session)):
 
 @game_router.post("/include")
 @limiter.limit("5/minute")
-async def include(request:Request, game_schema: GameSchema, user_id: int=Depends(get_current_user_id), session:Session=Depends(get_session)):
-    item = GameUser(
-            user_id=user_id,
-            game_id = game_schema.game_id,
-            avg_fps = game_schema.avg_fps,
-            min_fps = game_schema.min_fps,
-            max_fps = game_schema.max_fps,
-            preset = game_schema.preset,
-            resolution = game_schema.resolution,
-            upscaling = game_schema.upscaling
-    )
-
+async def include(request: Request, game_schema: AddGameUserSchema, user_id = Depends(get_current_user_id), session: Session = Depends(get_session)):
     try:
-        session.add(item)
-        session.commit()
+        existing_entry = session.query(GameUser).filter(
+            GameUser.user_id == user_id,
+            GameUser.game_id == game_schema.game_id
+        ).first()
+
+        if existing_entry:
+            has_changes = (
+                existing_entry.preset != game_schema.preset or
+                existing_entry.resolution != game_schema.resolution or
+                existing_entry.upscaling != game_schema.upscaling or
+                existing_entry.avg_fps != game_schema.avg_fps or
+                existing_entry.min_fps != game_schema.min_fps or
+                existing_entry.max_fps != game_schema.max_fps
+            )
+
+            if has_changes:
+                existing_entry.preset = game_schema.preset
+                existing_entry.resolution = game_schema.resolution
+                existing_entry.upscaling = game_schema.upscaling
+                existing_entry.avg_fps = game_schema.avg_fps
+                existing_entry.min_fps = game_schema.min_fps
+                existing_entry.max_fps = game_schema.max_fps
+                
+                session.commit()
+                return {"status": "ok", "message": "game benchmark updated"}
+            else:
+                return {"status": "ok", "message": "game benchmark already up to date"}
+
+        else:
+            new_item = GameUser(
+                user_id=user_id,
+                game_id=game_schema.game_id,
+                avg_fps=game_schema.avg_fps,
+                min_fps=game_schema.min_fps,
+                max_fps=game_schema.max_fps,
+                preset=game_schema.preset,
+                resolution=game_schema.resolution,
+                upscaling=game_schema.upscaling
+            )
+            
+            session.add(new_item)
+            session.commit()
+            return {"status": "ok", "message": "game inserted"}
+
     except Exception as e:
+        session.rollback()
+        print(f"Erro no /games/include: {e}") 
         raise HTTPException(status_code=500, detail="Internal Server Error")
 
-    return {
-        "status": "ok",
-        "message": "game inserted"
-    }
 
 @game_router.get("/user_list", response_model=GameListSchema)
 @limiter.limit("5/minute")
-async def user_list(request: Request, user_id: int = Depends(get_current_user_id), session: Session = Depends(get_session)):
+async def user_list(request: Request, user_id = Depends(get_current_user_id), session: Session = Depends(get_session)):
     user_games = (
-        session.query(GameUser, Game.name.label("game_name"))
+        session.query(GameUser, Game.name.label("game_name"), Game.name.label("image_url"))
         .join(Game, Game.id == GameUser.game_id)
         .filter(GameUser.user_id == user_id)
         .all()
@@ -60,7 +90,8 @@ async def user_list(request: Request, user_id: int = Depends(get_current_user_id
         items=[
             GameSchema(
                 game_name=game_name,
-                game_id = gu.game_id,
+                game_id=gu.game_id,
+                image_url=image_url,
                 avg_fps=gu.avg_fps,
                 min_fps=gu.min_fps,
                 max_fps=gu.max_fps,
@@ -68,7 +99,7 @@ async def user_list(request: Request, user_id: int = Depends(get_current_user_id
                 resolution=gu.resolution,
                 upscaling=gu.upscaling,
             )
-            for gu, game_name in user_games
+            for gu, game_name, image_url in user_games
         ]
     )
 
@@ -131,4 +162,34 @@ async def get_game_info(
     return GameInfoResponseSchema(
         status="ok",
         game=GameInfoSchema(**game_info)
+    )
+
+@game_router.get("/recent", response_model=GameListSchema)
+@limiter.limit("10/minute")
+async def recent_global_estimates(request: Request, session: Session = Depends(get_session)):
+    """Busca as 3 últimas estimativas globais usando a ordenação nativa do banco."""
+    
+    recent_games = (
+        session.query(GameUser, Game.name.label("game_name"))
+        .join(Game, Game.id == GameUser.game_id)
+        .order_by(GameUser.updated_at.desc())
+        .limit(3)
+        .all()
+    )
+
+    return GameListSchema(
+        status="ok",
+        items=[
+            GameSchema(
+                game_name=game_name,
+                game_id=gu.game_id,
+                avg_fps=gu.avg_fps,
+                min_fps=gu.min_fps,
+                max_fps=gu.max_fps,
+                preset=gu.preset,
+                resolution=gu.resolution,
+                upscaling=gu.upscaling,
+            )
+            for gu, game_name in recent_games
+        ]
     )

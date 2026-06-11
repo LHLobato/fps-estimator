@@ -31,7 +31,7 @@ export function HardwareSearchInput({
           className="w-full bg-transparent border-b border-white/20 focus:border-cyan-400 py-3 px-0 text-white font-body-md outline-none transition-all placeholder:text-slate-600"
         />
         {loading && (
-          <p className="text-xs text-slate-500 mt-2">Buscando...</p>
+          <p className="text-xs text-slate-500 mt-2">Searching...</p>
         )}
         {showDropdown && (
           <div className="absolute top-full left-0 right-0 bg-slate-900 border border-cyan-500/40 rounded mt-2 max-h-48 overflow-y-auto z-50">
@@ -48,11 +48,11 @@ export function HardwareSearchInput({
           </div>
         )}
         {showEmpty && (
-          <p className="text-xs text-slate-500 mt-2">Nenhum resultado encontrado.</p>
+          <p className="text-xs text-slate-500 mt-2">No results found.</p>
         )}
       </div>
       {selected && (
-        <p className="text-xs text-cyan-400 mt-2">Selecionado: {selected}</p>
+        <p className="text-xs text-cyan-400 mt-2">Selected: {selected}</p>
       )}
     </div>
   );

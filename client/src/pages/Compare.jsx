@@ -50,7 +50,7 @@ export default function Compare() {
           if (user.ram) setSetup1RAM(user.ram);
         }
       } catch (err) {
-        console.log("Usuário não logado, os campos permanecerão vazios.");
+        console.log("User not logged in, the fields will remain empty.");
       }
     };
     loadUserHardware();
@@ -66,7 +66,7 @@ export default function Compare() {
 
   const handleCompare = async () => {
     if (!setup1CPU || !setup1GPU || !setup1RAM || !setup2CPU || !setup2GPU || !setup2RAM || !compareGame) {
-      setError('SYSTEM_WARNING: Preencha todos os campos obrigatórios para análise.');
+      setError('SYSTEM_WARNING: Fill in all required fields for analysis.');
       return;
     }
 
@@ -104,7 +104,7 @@ export default function Compare() {
       setResult1(data1);
       setResult2(data2);
     } catch (err) {
-      setError(err.message || 'Erro de telemetria ao processar comparação.');
+      setError(err.message || 'Telemetry error when processing comparison.');
     } finally {
       setLoading(false);
     }
@@ -163,7 +163,7 @@ export default function Compare() {
 
                 <HardwareSearchInput
                   label="CPU"
-                  placeholder="Buscar CPU..."
+                  placeholder="Search CPU..."
                   search={setup1CPUSearch}
                   onSearchChange={setSetup1CPUSearch}
                   results={setup1CpuResults}
@@ -174,7 +174,7 @@ export default function Compare() {
 
                 <HardwareSearchInput
                   label="GPU"
-                  placeholder="Buscar GPU..."
+                  placeholder="Search GPU..."
                   search={setup1GPUSearch}
                   onSearchChange={setSetup1GPUSearch}
                   results={setup1GpuResults}
@@ -221,7 +221,7 @@ export default function Compare() {
 
                 <HardwareSearchInput
                   label="CPU"
-                  placeholder="Buscar CPU..."
+                  placeholder="Search CPU..."
                   search={setup2CPUSearch}
                   onSearchChange={setSetup2CPUSearch}
                   results={setup2CpuResults}
@@ -232,7 +232,7 @@ export default function Compare() {
 
                 <HardwareSearchInput
                   label="GPU"
-                  placeholder="Buscar GPU..."
+                  placeholder="Search GPU..."
                   search={setup2GPUSearch}
                   onSearchChange={setSetup2GPUSearch}
                   results={setup2GpuResults}

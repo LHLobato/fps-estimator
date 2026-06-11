@@ -1,10 +1,23 @@
 import api from "./config";
 
-// --- INTERFACES (Alinhadas com schemas.py) ---
+// --- INTERFACES (Alinhadas com schemas.py e Banco de Dados) ---
 
+// 1. Payload de Envio: Exatamente as colunas da tabela game_users
+export interface AddGameUserSchema {
+  game_id: string; // UUID obrigatório que liga à tabela 'games'
+  avg_fps: number;
+  min_fps: number;
+  max_fps: number;
+  preset: string;
+  resolution: string;
+  upscaling: string;
+}
+
+// 2. Payload de Resposta: O que o DB devolve após fazer JOIN com a tabela 'games'
 export interface GameSchema {
-  game_name: string;
+  game_name: string; // Vem do JOIN
   game_id: string; // UUID
+  image_url?; string;
   avg_fps: number;
   min_fps: number;
   max_fps: number;
@@ -64,9 +77,8 @@ export async function get_game_info(
   return response.data;
 }
 
-// Salva o benchmark de um jogo no perfil do usuário (Requer Autenticação)
-export async function include_game(
-  gameData: GameSchema,
+export async function add_user_game(
+  gameData: AddGameUserSchema,
 ): Promise<DefaultResponse> {
   const response = await api.post<DefaultResponse>("/games/include", gameData);
   return response.data;
@@ -75,5 +87,11 @@ export async function include_game(
 // Lista os jogos salvos no perfil do usuário logado (Requer Autenticação)
 export async function get_user_games(): Promise<GameListResponse> {
   const response = await api.get<GameListResponse>("/games/user_list");
+  return response.data;
+}
+
+// Busca as últimas 3 análises globais da comunidade (Não requer Autenticação)
+export async function get_recent_global(): Promise<GameListResponse> {
+  const response = await api.get<GameListResponse>("/games/recent");
   return response.data;
 }

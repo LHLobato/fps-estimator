@@ -18,24 +18,9 @@ export default function User() {
   const [modifiedFields, setModifiedFields] = useState(() => new Set());
 
   const [rams] = useState([
-    '128GB DDR5',
-    '64GB DDR5',
-    '32GB DDR5',
-    '16GB DDR5',
-    '8GB DDR5',
-    '4GB DDR5',
-    '128GB DDR4',
-    '64GB DDR4',
-    '32GB DDR4',
-    '16GB DDR4',
-    '8GB DDR4',
-    '4GB DDR4',
-    '128GB DDR3',
-    '64GB DDR3',
-    '32GB DDR3',
-    '16GB DDR3',
-    '8GB DDR3',
-    '4GB DDR3',
+    '128GB DDR5', '64GB DDR5', '32GB DDR5', '16GB DDR5', '8GB DDR5', '4GB DDR5',
+    '128GB DDR4', '64GB DDR4', '32GB DDR4', '16GB DDR4', '8GB DDR4', '4GB DDR4',
+    '128GB DDR3', '64GB DDR3', '32GB DDR3', '16GB DDR3', '8GB DDR3', '4GB DDR3',
   ]);
 
   // Estado de busca
@@ -68,13 +53,13 @@ export default function User() {
           ram: user.ram || ''
         });
 
-        // Processar jogos
+        // Processar jogos globais para uso no fallback
         if (gamesList.games && Array.isArray(gamesList.games)) {
           setGames(gamesList.games);
         }
       } catch (err) {
-        setError('Erro ao carregar dados do perfil');
-        console.error('Erro completo:', err);
+        setError('Error loading profile data');
+        console.error('Full error:', err);
       } finally {
         setLoadingUser(false);
       }
@@ -93,7 +78,7 @@ export default function User() {
           setUserGames(response.items);
         }
       } catch (err) {
-        console.error('Erro ao carregar jogos do usuário:', err);
+        console.error('Error loading user games:', err);
       } finally {
         setLoadingGames(false);
       }
@@ -160,7 +145,7 @@ export default function User() {
     const isEditing = editingFields.has(field);
     const isModified = modifiedFields.has(field);
     const showSelected = isModified && configValue;
-    const readOnlyDisplay = isModified ? '' : (configValue || 'Clique para selecionar...');
+    const readOnlyDisplay = isModified ? '' : (configValue || 'Click to select...');
 
     const finishSelection = (item) => {
       handleConfigChange(field, item);
@@ -256,13 +241,18 @@ export default function User() {
     }
   };
 
+  // Calcula a média de FPS baseada na biblioteca do usuário
+  const avgLibraryFps = userGames.length > 0 
+    ? Math.round(userGames.reduce((acc, curr) => acc + curr.avg_fps, 0) / userGames.length)
+    : 0;
+
   return (
     <div className="w-full">
       {/* Hero Title */}
       <div className="mb-10">
         <h1 className="font-headline-xl text-cyan-400 mb-2 uppercase">Neural Library</h1>
         <p className="font-body-lg text-on-surface-variant max-w-2xl">
-          {loadingUser ? 'Carregando perfil...' : `Bem-vindo, ${userData?.name || userData?.email || 'Usuário'}!`}
+          {loadingUser ? 'Loading profile...' : `Welcome, ${userData?.name || userData?.email || 'Usuário'}!`}
         </p>
       </div>
 
@@ -356,16 +346,16 @@ export default function User() {
             <h3 className="font-label-caps text-on-surface">Performance History</h3>
           </div>
 
-          <div className="p-6 space-y-6 flex-1">
+          <div className="p-6 space-y-6 flex-1 flex flex-col">
             <div className="space-y-4">
               <div className="flex justify-between items-end border-b border-white/5 pb-2">
                 <div>
                   <p className="font-label-caps text-[10px] text-slate-500">TOTAL_GAMES</p>
-                  <p className="font-body-md text-on-surface">Estimados</p>
+                  <p className="font-body-md text-on-surface">Estimates</p>
                 </div>
                 <div className="text-right">
                   <p className="font-data-display text-2xl text-cyan-400">
-                    {userGames.length || 0} <span className="text-xs font-label-caps">JOGOS</span>
+                    {userGames.length || 0} <span className="text-xs font-label-caps">GAMES</span>
                   </p>
                 </div>
               </div>
@@ -373,7 +363,7 @@ export default function User() {
               <div className="flex justify-between items-end border-b border-white/5 pb-2">
                 <div>
                   <p className="font-label-caps text-[10px] text-slate-500">SYSTEM STATUS</p>
-                  <p className="font-body-md text-on-surface">Configurado</p>
+                  <p className="font-body-md text-on-surface">Configured</p>
                 </div>
                 <div className="text-right">
                   <p className="font-data-display text-2xl text-violet-400">
@@ -383,26 +373,20 @@ export default function User() {
               </div>
             </div>
 
-            {/* Mini Trend Chart */}
-            <div className="mt-auto h-24 w-full relative">
-              <svg className="w-full h-full" viewBox="0 0 100 40">
-                <defs>
-                  <linearGradient id="lineGrad" x1="0" x2="0" y1="0" y2="1">
-                    <stop offset="0%" stopColor="#00f0ff" stopOpacity="0.4"></stop>
-                    <stop offset="100%" stopColor="#00f0ff" stopOpacity="0"></stop>
-                  </linearGradient>
-                </defs>
-                <path
-                  d="M0 40 L0 30 Q 10 10, 20 25 T 40 15 T 60 30 T 80 5 T 100 20 L 100 40 Z"
-                  fill="url(#lineGrad)"
-                ></path>
-                <path
-                  d="M0 30 Q 10 10, 20 25 T 40 15 T 60 30 T 80 5 T 100 20"
-                  fill="none"
-                  stroke="#00f0ff"
-                  strokeWidth="1"
-                ></path>
-              </svg>
+            {/* Nova Métrica: Média de FPS da Biblioteca */}
+            <div className="mt-auto bg-slate-900/50 rounded p-4 border border-white/5">
+              <p className="font-label-caps text-[10px] text-slate-500 mb-1">AVERAGE LIBRARY FPS</p>
+              <div className="flex items-baseline gap-2">
+                <span className="text-4xl font-data-display text-cyan-400">{avgLibraryFps}</span>
+                <span className="font-label-caps text-xs text-slate-400">FPS</span>
+              </div>
+              <div className="w-full h-1.5 bg-slate-800 mt-3 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-gradient-to-r from-cyan-400 to-violet-500 transition-all duration-1000"
+                  style={{ width: `${Math.min((avgLibraryFps / 144) * 100, 100)}%` }}
+                ></div>
+              </div>
+              <p className="text-[9px] text-slate-500 font-label-caps mt-2 text-right">BASED ON 144HZ STANDARD</p>
             </div>
           </div>
         </section>
@@ -417,7 +401,7 @@ export default function User() {
                 {userGames.length} / {games.length}
               </span>
             </div>
-            <button onClick={() => navigate('/estimate')} className="flex items-center gap-2 font-label-caps text-xs text-cyan-400 hover:text-white transition-colors">
+            <button onClick={() => navigate('/')} className="flex items-center gap-2 font-label-caps text-xs text-cyan-400 hover:text-white transition-colors">
               <span className="material-symbols-outlined text-sm">add</span>
               ADD NEW TITLE
             </button>
@@ -425,48 +409,72 @@ export default function User() {
 
           {loadingGames ? (
             <div className="p-gutter">
-              <p className="text-slate-400">Carregando jogos...</p>
+              <p className="text-slate-400">Loading games...</p>
             </div>
           ) : userGames.length > 0 ? (
             <div className="p-gutter grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
               {/* Game Cards - Jogos do Usuário */}
-              {userGames.map((game, idx) => (
-                <div
-                  key={idx}
-                  className="group relative aspect-[3/4] rounded-lg overflow-hidden border border-cyan-500/40 hover:border-cyan-400 transition-all"
-                >
-                  {game.image_url ? (
-                    <img
-                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                      src={game.image_url}
-                      alt={game.game_name}
-                    />
-                  ) : (
-                    <div className="w-full h-full bg-slate-800 flex items-center justify-center">
-                      <p className="text-slate-500 text-xs">{game.game_name}</p>
-                    </div>
-                  )}
-                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent flex flex-col justify-end p-4">
-                    <span
-                      className="bg-cyan-500/20 text-cyan-400 border border-cyan-500/40 font-label-caps text-[8px] w-fit px-2 py-0.5 rounded-full mb-2"
-                    >
-                      FPS: {game.avg_fps}
-                    </span>
-                    <h4 className="font-headline-md text-sm text-white mb-1">{game.game_name}</h4>
-                    <div className="flex justify-between items-center">
-                      <span className="font-label-caps text-[9px] text-slate-400">
-                        {game.preset} • {game.resolution}
+              {userGames.map((game, idx) => {
+                // FALLBACK BLINDADO: Cruzamento local de dados
+                const catalogGame = games.find((g) => g.id === game.game_id);
+                
+                // Pega a URL de onde estiver disponível, validando strings nulas
+                let finalImageUrl = game.image_url && game.image_url !== 'None' && game.image_url !== 'null'
+                  ? game.image_url 
+                  : (catalogGame?.image_url && catalogGame.image_url !== 'None' && catalogGame.image_url !== 'null'
+                      ? catalogGame.image_url
+                      : null);
+
+                // Força o HTTPS se a API tiver retornado links agnósticos (//...)
+                if (finalImageUrl && finalImageUrl.startsWith('//')) {
+                  finalImageUrl = `https:${finalImageUrl}`;
+                }
+
+                return (
+                  <div
+                    key={idx}
+                    onClick={() => navigate('/estimate')}
+                    className="group relative aspect-[3/4] rounded-lg overflow-hidden border border-cyan-500/40 hover:border-cyan-400 transition-all bg-slate-900 cursor-pointer"
+                  >
+                    {finalImageUrl ? (
+                      <img
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                        src={finalImageUrl}
+                        alt={game.game_name}
+                        onError={(e) => {
+                          e.target.style.display = 'none';
+                        }}
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-slate-800 flex flex-col items-center justify-center text-center p-4">
+                        <span className="material-symbols-outlined text-slate-600 mb-2 text-2xl">image_not_supported</span>
+                        <p className="text-slate-500 text-[10px] font-label-caps tracking-widest">{game.game_name}</p>
+                      </div>
+                    )}
+                    
+                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent flex flex-col justify-end p-4">
+                      <span className="bg-cyan-500/20 text-cyan-400 border border-cyan-500/40 font-label-caps text-[8px] w-fit px-2 py-0.5 rounded-full mb-2 backdrop-blur-sm">
+                        FPS: {game.avg_fps}
                       </span>
-                      <span className="material-symbols-outlined text-cyan-400 text-lg group-hover:translate-x-1 transition-transform">
-                        play_arrow
-                      </span>
+                      <h4 className="font-headline-md text-sm text-white mb-1 drop-shadow-md">{game.game_name}</h4>
+                      <div className="flex justify-between items-center">
+                        <span className="font-label-caps text-[9px] text-slate-300 drop-shadow-md">
+                          {game.preset} • {game.resolution}
+                        </span>
+                        <span className="material-symbols-outlined text-cyan-400 text-lg group-hover:translate-x-1 transition-transform drop-shadow-[0_0_8px_rgba(0,240,255,0.8)]">
+                          play_arrow
+                        </span>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
 
               {/* Placeholder para adicionar novo */}
-              <button className="aspect-[3/4] rounded-lg border-2 border-dashed border-cyan-500/20 bg-cyan-500/5 flex flex-col items-center justify-center gap-4 hover:bg-cyan-500/10 hover:border-cyan-500/40 transition-all group">
+              <button 
+                onClick={() => navigate('/')}
+                className="aspect-[3/4] rounded-lg border-2 border-dashed border-cyan-500/20 bg-cyan-500/5 flex flex-col items-center justify-center gap-4 hover:bg-cyan-500/10 hover:border-cyan-500/40 transition-all group"
+              >
                 <div className="w-16 h-16 rounded-full border border-cyan-500/30 flex items-center justify-center group-hover:scale-110 transition-transform">
                   <span className="material-symbols-outlined text-3xl text-cyan-400">add</span>
                 </div>
@@ -475,7 +483,7 @@ export default function User() {
             </div>
           ) : (
             <div className="p-gutter">
-              <p className="text-slate-400 text-center py-12">Você ainda não tem jogos estimados. Vá para a página de <strong>Estimate</strong> para começar!</p>
+              <p className="text-slate-400 text-center py-12">You don't have any estimated games yet. Go to the <strong>Estimate</strong> page to get started!</p>
             </div>
           )}
         </section>

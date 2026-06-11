@@ -4,14 +4,14 @@ import GlassCard from '../components/GlassCard';
 import { HardwareSearchInput } from '../components/HardwareSearchInput';
 import * as llmAPI from '../api/llm';
 import * as userAPI from '../api/user';
-import * as gamesAPI from '../api/games'; // Importação para salvar o jogo
+import * as gamesAPI from '../api/games';
 import { useGameSearch } from '../hooks/useGameSearch';
 import { useCpuSearch, useGpuSearch } from '../hooks/useHardwareSearch';
 import { filterRamOptions } from '../utils/filterRam';
 
 export default function Estimate() {
   const [selectedGame, setSelectedGame] = useState('');
-  const [selectedGameId, setSelectedGameId] = useState(''); // State para o UUID do jogo
+  const [selectedGameId, setSelectedGameId] = useState('');
   const [selectedGameImage, setSelectedGameImage] = useState(null);
   const [selectedPreset, setSelectedPreset] = useState('HIGH');
   const [selectedResolution, setSelectedResolution] = useState('1440P');
@@ -23,7 +23,11 @@ export default function Estimate() {
   const [gpuSearch, setGpuSearch] = useState('');
   const [ramSearch, setRamSearch] = useState('');
 
+  // Começa vazio, será preenchido pelo backend
+  const [recentEstimates, setRecentEstimates] = useState([]);
+
   useEffect(() => {
+    // 1. Carrega Hardware do Usuário
     const loadUserHardware = async () => {
       try {
         const user = await userAPI.get_current_user();
@@ -33,11 +37,31 @@ export default function Estimate() {
           if (user.ram) setSelectedRAM(user.ram);
         }
       } catch (err) {
-        console.log("Hardware prévio não carregado (Guest ou não logado).");
+        console.log("Previous hardware not loaded (Guest or not logged in).");
+      }
+    };
+
+    // 2. Carrega as últimas 3 estimativas
+    const loadGlobalRecent = async () => {
+      try {
+        const response = await gamesAPI.get_recent_global();
+        if (response.items && response.items.length > 0) {
+          const formattedRecent = response.items.map((item, index) => ({
+            id: `${item.game_id}-${Date.now()}-${index}`,
+            name: item.game_name,
+            specs: `${item.resolution} • ${item.preset}`,
+            fps: item.avg_fps,
+            color: index % 2 === 0 ? 'cyan' : 'secondary',    
+          }));
+          setRecentEstimates(formattedRecent);
+        }
+      } catch (err) {
+        console.error("The global log could not be loaded:", err);
       }
     };
 
     loadUserHardware();
+    loadGlobalRecent();
   }, []); 
 
   const [rams] = useState([
@@ -50,23 +74,6 @@ export default function Estimate() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const [recentEstimates, setRecentEstimates] = useState([
-    {
-      id: 1,
-      name: 'Cyberpunk 2077',
-      specs: '1440p • RTX 4090 • Ultra',
-      fps: 142,
-      color: 'cyan',
-    },
-    {
-      id: 2,
-      name: 'Elden Ring',
-      specs: '4K • RTX 4090 • Ultra',
-      fps: 60,
-      color: 'secondary',
-    },
-  ]);
-
   const { results: gameSearchResults, loading: gameSearchLoading } = useGameSearch(gameSearch, 10);
   const { results: cpuSearchResults, loading: cpuSearchLoading } = useCpuSearch(cpuSearch, 10);
   const { results: gpuSearchResults, loading: gpuSearchLoading } = useGpuSearch(gpuSearch, 10);
@@ -77,7 +84,7 @@ export default function Estimate() {
     e.preventDefault();
 
     if (!selectedGame || !selectedGameId || !selectedGPU || !selectedCPU || !selectedRAM) {
-      setError('SYSTEM_WARNING: Preencha todos os dados de telemetria e selecione o jogo da lista.');
+      setError('SYSTEM_WARNING: Fill in all telemetry data and select the game from the list.');
       return;
     }
 
@@ -103,32 +110,33 @@ export default function Estimate() {
       // 2. Tenta salvar o resultado na Neural Library do usuário
       try {
         await gamesAPI.add_user_game({
-          game_name: selectedGame,
-          game_id: selectedGameId, // Enviando o UUID obrigatório
+          game_id: selectedGameId, 
           preset: selectedPreset,
           resolution: selectedResolution,
           upscaling: 'DLSS',
-          avg_fps: Math.round(data.avg_fps), // Convertendo para integer conforme o DB
+          avg_fps: Math.round(data.avg_fps), 
           min_fps: Math.round(data.min_fps),
           max_fps: Math.round(data.max_fps)
         });
       } catch (saveErr) {
-        console.error("Erro ao salvar na biblioteca:", saveErr.response?.data || saveErr.message);
+        console.error("Error saving to library:", saveErr.response?.data || saveErr.message);
       }
 
-      // 3. Atualiza o histórico visual da sessão atual
-      setRecentEstimates((prev) => [
-        {
+      // 3. Atualiza o histórico visual da sessão atual (Empurra para o topo e mantém máx 3)
+      setRecentEstimates((prev) => {
+        const newEstimate = {
           id: Date.now(),
           name: selectedGame,
           specs: `${selectedResolution} • ${selectedGPU.split(' ').pop()} • ${selectedPreset}`,
           fps: Math.round(data.avg_fps) || 0,
           color: 'cyan',
-        },
-        ...prev.slice(0, 2),
-      ]);
+        };
+        // Mantém apenas os 2 mais recentes anteriores para formar 3 totais
+        return [newEstimate, ...prev.slice(0, 2)];
+      });
+      
     } catch (err) {
-      setError(err.message || 'Erro na comunicação com a API de predição.');
+      setError(err.message || 'Error communicating with the prediction API.');
     } finally {
       setLoading(false);
     }
@@ -206,7 +214,7 @@ export default function Estimate() {
                     onChange={(e) => setGameSearch(e.target.value)}
                     className="w-full bg-transparent border-b border-white/20 focus:border-cyan-400 py-3 text-white font-body-md outline-none transition-all placeholder:text-slate-600"
                   />
-                  {gameSearchLoading && <p className="text-xs text-slate-500 mt-2">Buscando na database...</p>}
+                  {gameSearchLoading && <p className="text-xs text-slate-500 mt-2">Searching the database...</p>}
                   
                   {/* DROPDOWN COM IMAGENS */}
                   {gameSearch && !gameSearchLoading && gameSearchResults.length > 0 && (
@@ -311,7 +319,7 @@ export default function Estimate() {
               {/* CPU e GPU Components */}
               <HardwareSearchInput
                 label="PROCESSOR_UNIT (CPU)"
-                placeholder="Buscar modelo de CPU..."
+                placeholder="Search for CPU model..."
                 search={cpuSearch}
                 onSearchChange={setCpuSearch}
                 results={cpuSearchResults}
@@ -322,7 +330,7 @@ export default function Estimate() {
 
               <HardwareSearchInput
                 label="GRAPHICS_UNIT (GPU)"
-                placeholder="Buscar modelo de GPU..."
+                placeholder="Search for GPU model..."
                 search={gpuSearch}
                 onSearchChange={setGpuSearch}
                 results={gpuSearchResults}
@@ -339,7 +347,7 @@ export default function Estimate() {
                 <div className="relative">
                   <input
                     type="text"
-                    placeholder="Buscar capacidade e tipo..."
+                    placeholder="Looking for capacity and type..."
                     value={ramSearch}
                     onChange={(e) => setRamSearch(e.target.value)}
                     className="w-full bg-transparent border-b border-white/20 focus:border-cyan-400 py-3 text-white font-body-md outline-none transition-all placeholder:text-slate-600"
@@ -383,24 +391,30 @@ export default function Estimate() {
           </GlassCard>
         </div>
 
-        {/* HISTÓRICO DE ANÁLISES */}
+        {/* HISTÓRICO DE ANÁLISES GLOBAIS */}
         <div className="col-span-12">
-          <GlassCard title="RECENT_ANALYSIS_LOG">
+          <GlassCard title="COMMUNITY_RECENT_LOGS">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {recentEstimates.map((est) => (
-                <div key={est.id} className="bg-slate-900/50 p-6 rounded border border-white/5 flex items-center justify-between">
-                  <div>
-                    <h4 className="text-white font-headline-md mb-1">{est.name}</h4>
-                    <p className="text-xs text-slate-400">{est.specs}</p>
+              {recentEstimates.length > 0 ? (
+                recentEstimates.map((est) => (
+                  <div key={est.id} className="bg-slate-900/50 p-6 rounded border border-white/5 flex items-center justify-between">
+                    <div>
+                      <h4 className="text-white font-headline-md mb-1">{est.name}</h4>
+                      <p className="text-xs text-slate-400">{est.specs}</p>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-3xl font-data-display" style={{ color: est.color === 'secondary' ? 'var(--secondary-violet, #b600f8)' : '#00dbe9' }}>
+                        {est.fps}
+                      </span>
+                      <span className="font-label-caps text-[10px] text-slate-500 ml-1">FPS</span>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <span className="text-3xl font-data-display" style={{ color: est.color === 'secondary' ? 'var(--secondary-violet, #b600f8)' : '#00dbe9' }}>
-                      {est.fps}
-                    </span>
-                    <span className="font-label-caps text-[10px] text-slate-500 ml-1">FPS</span>
-                  </div>
+                ))
+              ) : (
+                <div className="col-span-3 text-center py-6">
+                  <p className="text-slate-500 font-label-caps text-xs">Establishing a connection to the global telemetry log...</p>
                 </div>
-              ))}
+              )}
             </div>
           </GlassCard>
         </div>
