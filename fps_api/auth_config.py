@@ -5,8 +5,9 @@ Centraliza todas as configurações relacionadas a auth para facilitar manutenç
 
 import os
 from datetime import timedelta
-from dotenv import load_dotenv
 from pathlib import Path
+
+from dotenv import load_dotenv
 
 # Carrega .env do diretório fps_api
 env_path = Path(__file__).parent / ".env"
@@ -32,8 +33,8 @@ SMTP_FROM_EMAIL = os.getenv("SMTP_FROM_EMAIL")
 # ========================
 # OTP Configuration
 # ========================
-OTP_LOGIN_INTERVAL = 60  # 1 minuto para login
-OTP_SIGNUP_INTERVAL = 300  # 5 minutos para signup
+OTP_LOGIN_INTERVAL = 300
+OTP_SIGNUP_INTERVAL = 900
 
 
 def get_token_expires_minutes() -> int:
