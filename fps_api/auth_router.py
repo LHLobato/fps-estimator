@@ -6,7 +6,16 @@ Implementa criptografia de senhas, JWT e verificação por email (OTP).
 import time
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
+
 import pyotp
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from jose import JWTError, jwt
+from passlib.context import CryptContext
+
+# from model.text_func import get_embedding  # Lazy import para evitar sentence_transformers no startup
+from sqlalchemy import text
+from sqlalchemy.orm import Session
+
 from fps_api.auth_config import (
     ACCESS_TOKEN_EXPIRE_MINUTES,
     ALGORITHM,
@@ -16,12 +25,9 @@ from fps_api.auth_config import (
     SECRET_KEY,
 )
 from fps_api.build_db import Users
-from fps_api.email_utils import send_email_login, send_email_recovery, send_email_signup
-from fastapi import APIRouter, Depends, HTTPException, status, Request
-from jose import JWTError, jwt
-from passlib.context import CryptContext
-from fps_api.limiter import limiter
 from fps_api.dependencies import get_current_user_id, get_session
+from fps_api.email_utils import send_email_login, send_email_recovery, send_email_signup
+from fps_api.limiter import limiter
 from fps_api.schemas import (
     CodeSchema,
     LoginSchema,
@@ -31,9 +37,6 @@ from fps_api.schemas import (
     UserCreate,
     UserResponse,
 )
-from sqlalchemy.orm import Session
-# from model.text_func import get_embedding  # Lazy import para evitar sentence_transformers no startup
-from sqlalchemy import text
 
 bcrypt_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -53,6 +56,7 @@ def generate_token(
     expire = datetime.now(timezone.utc) + expires_delta
     payload = {"sub": str(user_id), "exp": expire}
     return jwt.encode(payload, SECRET_KEY, ALGORITHM)
+
 
 def authenticate_user(email: str, password: str, session: Session):
     """
@@ -107,7 +111,7 @@ async def create_account(
     """
     # Lazy import para evitar carregar sentence_transformers no startup
     from model.text_func import get_embedding
-    
+
     # Verifica se email já existe
     existing_user = session.query(Users).filter(Users.email == user_data.email).first()
     if existing_user:
@@ -122,12 +126,13 @@ async def create_account(
             SELECT id FROM gpus
             ORDER BY embedding <=> CAST(:vec AS vector)
             LIMIT 1
-        """),   {"vec": str(gpu_embedding)}).scalar()
+        """),
+        {"vec": str(gpu_embedding)},
+    ).scalar()
 
     if not gpu:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="GPU not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail="GPU not found"
         )
 
     cpu_embedding = await get_embedding(user_data.cpu)
@@ -136,12 +141,13 @@ async def create_account(
             SELECT id FROM cpus
             ORDER BY embedding <=> CAST(:vec AS vector)
             LIMIT 1
-        """),   {"vec": str(cpu_embedding)}).scalar()
+        """),
+        {"vec": str(cpu_embedding)},
+    ).scalar()
 
     if not cpu:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="GPU not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail="GPU not found"
         )
 
     try:
@@ -411,7 +417,7 @@ async def get_current_user(
 
     # Buscar nome da GPU através da relação
     gpu_name = user.gpu_rel.name if user.gpu_rel else None
-    
+
     # Buscar nome da CPU através da relação
     cpu_name = user.cpu_rel.name if user.cpu_rel else None
 
@@ -431,7 +437,8 @@ async def get_current_user(
     status_code=status.HTTP_200_OK,
 )
 @limiter.limit("5/minute")
-async def forgot_password(request: Request, user_schema: UserBase, session: Session = Depends(get_session)
+async def forgot_password(
+    request: Request, user_schema: UserBase, session: Session = Depends(get_session)
 ):
     """
     Consulta o Banco para verificar se o usuário está cadastro, caso esteja, um código será enviado
@@ -455,7 +462,8 @@ async def forgot_password(request: Request, user_schema: UserBase, session: Sess
 
 @auth_router.post("/verify_recovery_code")
 @limiter.limit("10/minute")
-async def verify_recovery_code(request: Request, code_schema: CodeSchema, session: Session = Depends(get_session)
+async def verify_recovery_code(
+    request: Request, code_schema: CodeSchema, session: Session = Depends(get_session)
 ):
     user = session.query(Users).filter(Users.email == code_schema.email).first()
 
@@ -493,9 +501,13 @@ async def verify_recovery_code(request: Request, code_schema: CodeSchema, sessio
 
 @auth_router.post("/change_password")
 @limiter.limit("5/minute")
-async def change_password(request: Request, new_password: PasswordReset, session=Depends(get_session)):
+async def change_password(
+    request: Request, new_password: PasswordReset, session=Depends(get_session)
+):
     try:
-        payload = jwt.decode(new_password.reset_token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(
+            new_password.reset_token, SECRET_KEY, algorithms=[ALGORITHM]
+        )
     except JWTError:
         raise HTTPException(status_code=401, detail="Token inválido ou expirado")
     if payload.get("purpose") != "password_reset":

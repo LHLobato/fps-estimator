@@ -1,0 +1,16 @@
+fastapi==0.136.3
+passlib==1.7.4
+pgvector==0.4.2
+pydantic==2.13.4
+pyotp==2.9.0
+python-dotenv==1.2.2
+python_jose==3.5.0
+slowapi==0.1.10
+SQLAlchemy==2.0.50
+uvicorn==0.34.0
+google-genai
+numpy==2.4.6
+pandas==3.0.3
+psycopg2-binary
+sentence_transformers==5.4.1
+protobuf==7.35.1

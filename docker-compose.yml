@@ -1,0 +1,10 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: fps_api/Dockerfile
+    env_file:
+      - ./fps_api/.env
+      - ./model/.env
+    ports:
+      - "8000:8000"
