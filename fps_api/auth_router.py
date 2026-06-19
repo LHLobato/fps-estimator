@@ -5,10 +5,10 @@ Implementa criptografia de senhas, JWT e verificação por email (OTP).
 
 import time
 from datetime import datetime, timedelta, timezone
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import pyotp
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
@@ -21,6 +21,10 @@ from fps_api.auth_config import (
     ALGORITHM,
     OTP_LOGIN_INTERVAL,
     OTP_SIGNUP_INTERVAL,
+    REFRESH_COOKIE_NAME,
+    REFRESH_COOKIE_PATH,
+    REFRESH_COOKIE_SAMESITE,
+    REFRESH_COOKIE_SECURE,
     REFRESH_TOKEN_EXPIRE_DAYS,
     SECRET_KEY,
 )
@@ -32,7 +36,6 @@ from fps_api.schemas import (
     CodeSchema,
     LoginSchema,
     PasswordReset,
-    RefreshTokenRequest,
     UserBase,
     UserCreate,
     UserResponse,
@@ -49,13 +52,49 @@ auth_router = APIRouter(
 def generate_token(
     user_id: UUID,
     expires_delta: timedelta = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
+    token_type: str = "access",
 ) -> str:
     """
     Gera JWT token com payload {sub: user_id, exp: expiration}.
     """
-    expire = datetime.now(timezone.utc) + expires_delta
-    payload = {"sub": str(user_id), "exp": expire}
+    now = datetime.now(timezone.utc)
+    expire = now + expires_delta
+    payload = {
+        "sub": str(user_id),
+        "typ": token_type,
+        "iat": now,
+        "jti": str(uuid4()),
+        "exp": expire,
+    }
     return jwt.encode(payload, SECRET_KEY, ALGORITHM)
+
+
+def set_refresh_cookie(response: Response, user_id: UUID) -> None:
+    """Armazena o refresh JWT por sete dias em um cookie inacessivel ao JavaScript."""
+    refresh_token = generate_token(
+        user_id,
+        timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS),
+        token_type="refresh",
+    )
+    response.set_cookie(
+        key=REFRESH_COOKIE_NAME,
+        value=refresh_token,
+        max_age=REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
+        httponly=True,
+        secure=REFRESH_COOKIE_SECURE,
+        samesite=REFRESH_COOKIE_SAMESITE,
+        path=REFRESH_COOKIE_PATH,
+    )
+
+
+def clear_refresh_cookie(response: Response) -> None:
+    response.delete_cookie(
+        key=REFRESH_COOKIE_NAME,
+        path=REFRESH_COOKIE_PATH,
+        secure=REFRESH_COOKIE_SECURE,
+        httponly=True,
+        samesite=REFRESH_COOKIE_SAMESITE,
+    )
 
 
 def authenticate_user(email: str, password: str, session: Session):
@@ -204,6 +243,7 @@ async def create_account(
 async def verify_signup_code(
     request: Request,
     code_data: CodeSchema,
+    response: Response,
     session: Session = Depends(get_session),
 ):
     """
@@ -240,11 +280,10 @@ async def verify_signup_code(
 
     # Gera tokens
     access_token = generate_token(user.id)
-    refresh_token = generate_token(user.id, timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS))
+    set_refresh_cookie(response, user.id)
 
     return {
         "access_token": access_token,
-        "refresh_token": refresh_token,
         "token_type": "bearer",
         "user_id": user.id,
         "message": "Conta ativada com sucesso!",
@@ -300,6 +339,7 @@ async def login(
 @limiter.limit("10/minute")
 async def verify_login_code(
     request: Request,
+    response: Response,
     code_data: CodeSchema,
     session: Session = Depends(get_session),
 ):
@@ -333,11 +373,10 @@ async def verify_login_code(
 
     # Gera tokenss
     access_token = generate_token(user.id)
-    refresh_token = generate_token(user.id, timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS))
+    set_refresh_cookie(response, user.id)
 
     return {
         "access_token": access_token,
-        "refresh_token": refresh_token,
         "token_type": "bearer",
         "user_id": user.id,
     }
@@ -347,21 +386,28 @@ async def verify_login_code(
 @limiter.limit("10/minute")
 async def refresh_token(
     request: Request,
-    body: RefreshTokenRequest,
+    response: Response,
     session: Session = Depends(get_session),
 ):
     """
     Renova o access_token usando um refresh_token válido.
 
     - Verifica validade e expiração do refresh_token
-    - Retorna novo access_token e refresh_token
+    - Retorna somente um novo access_token; o refresh mantém o prazo original
     """
+    refresh_value = request.cookies.get(REFRESH_COOKIE_NAME)
+    if not refresh_value:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Sessao ausente ou expirada",
+        )
+
     try:
         # Decodifica o refresh token
-        payload = jwt.decode(body.refresh_token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(refresh_value, SECRET_KEY, algorithms=[ALGORITHM])
         user_id: str = payload.get("sub")
 
-        if user_id is None:
+        if user_id is None or payload.get("typ") != "refresh":
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Token inválido",
@@ -377,20 +423,26 @@ async def refresh_token(
 
         # Gera novos tokens
         new_access = generate_token(user.id)
-        new_refresh = generate_token(user.id, timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS))
 
         return {
             "access_token": new_access,
-            "refresh_token": new_refresh,
             "token_type": "bearer",
         }
 
     except JWTError:
+        clear_refresh_cookie(response)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token expirado ou inválido",
         )
 
+
+@auth_router.post("/logout", summary="Encerrar sessao")
+@limiter.limit("10/minute")
+async def logout(request: Request, response: Response):
+    """Remove o refresh cookie stateless do navegador."""
+    clear_refresh_cookie(response)
+    return {"status": "success", "message": "Logout realizado"}
 
 @auth_router.get(
     "/me", summary="Obter dados do usuário logado", response_model=UserResponse
@@ -502,7 +554,10 @@ async def verify_recovery_code(
 @auth_router.post("/change_password")
 @limiter.limit("5/minute")
 async def change_password(
-    request: Request, new_password: PasswordReset, session=Depends(get_session)
+    request: Request,
+    new_password: PasswordReset,
+    response: Response,
+    session=Depends(get_session),
 ):
     try:
         payload = jwt.decode(
@@ -528,11 +583,10 @@ async def change_password(
     session.commit()
 
     access_token = generate_token(user.id)
-    refresh_token = generate_token(user.id, timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS))
+    set_refresh_cookie(response, user.id)
 
     return {
         "access_token": access_token,
-        "refresh_token": refresh_token,
         "token_type": "bearer",
         "user_id": user.id,
     }

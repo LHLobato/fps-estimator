@@ -1,19 +1,22 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import * as authAPI from '../api/auth';
+import { useAuth } from '../hooks/useAuth';
 
 export default function Login() {
   const navigate = useNavigate();
-  
-  const [step, setStep] = useState('login'); 
-  
+  const { login, handleVerifyCode } = useAuth();
+
+  const [step, setStep] = useState('login');
+
   const [formData, setFormData] = useState({
     email: '',
     password: '',
     newPassword: '',
   });
-  
+
   const [code, setCode] = useState('');
+  const [resetToken, setResetToken] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -39,7 +42,7 @@ export default function Login() {
     if (step === 'login') {
       setIsLoading(true);
       try {
-        const response = await authAPI.login(formData);
+        await login(formData.email, formData.password);
         setSuccess('UPLINK_ESTABLISHED: Auth code dispatched to secure comms.');
         setStep('verify_code');
       } catch (err) {
@@ -47,26 +50,15 @@ export default function Login() {
       } finally {
         setIsLoading(false);
       }
-    } 
-    
+    }
+
     else if (step === 'verify_code') {
       setIsLoading(true);
       try {
-        const response = await authAPI.verify_code_login({
-          email: formData.email,
-          code,
-        });
-
-        localStorage.setItem('access_token', response.access_token);
-        if (response.refresh_token) {
-          localStorage.setItem('refresh_token', response.refresh_token);
-        }
+        await handleVerifyCode(formData.email, code);
 
         setSuccess('AUTHORIZATION_ACCEPTED: Initializing neural network parameters...');
-        
-        setTimeout(() => {
-          window.location.href = '/';
-        }, 1500);
+        navigate('/', { replace: true });
       } catch (err) {
         setError(err.response?.data?.detail || 'AUTH_FAILURE: Decryption sequence invalid.');
       } finally {
@@ -78,6 +70,8 @@ export default function Login() {
       setIsLoading(true);
       try {
         await authAPI.forgot_password({ email: formData.email });
+        setCode('');
+        setResetToken('');
         setSuccess('OVERRIDE_INITIATED: Recovery cipher transmitted to your endpoint.');
         setStep('verify_reset_token');
       } catch (err) {
@@ -92,23 +86,43 @@ export default function Login() {
         setError('SYNTAX_ERROR: Malformed recovery cipher detected.');
         return;
       }
-      handleResetState();
-      setStep('new_password');
+      setIsLoading(true);
+      try {
+        const response = await authAPI.verify_recovery_code({
+          email: formData.email,
+          code,
+        });
+        setResetToken(response.reset_token);
+        setCode('');
+        setSuccess('CIPHER_VALIDATED: Authorization sequence accepted.');
+        setStep('new_password');
+      } catch (err) {
+        setError(err.response?.data?.detail || 'VALIDATION_FAILURE: Recovery cipher invalid or expired.');
+      } finally {
+        setIsLoading(false);
+      }
     }
 
     else if (step === 'new_password') {
+      if (!resetToken) {
+        setError('AUTH_TOKEN_MISSING: Restart the recovery protocol.');
+        setStep('forgot_password');
+        return;
+      }
+
       setIsLoading(true);
       try {
         await authAPI.reset_password({
-          reset_token: code,
+          reset_token: resetToken,
           new_password: formData.newPassword
         });
-        
+
         setSuccess('KEYPHRASE_OVERRIDE_SUCCESSFUL. Systems re-secured. Standby for login routing...');
-        
+
         setTimeout(() => {
           setStep('login');
           setCode('');
+          setResetToken('');
           setFormData(prev => ({ ...prev, password: '', newPassword: '' }));
           handleResetState();
         }, 2500);
@@ -208,7 +222,7 @@ export default function Login() {
 
           <div className="relative z-10 w-full max-w-md mx-auto">
             <div className="glass-panel p-10 rounded-xl shadow-[0_0_50px_rgba(0,0,0,0.5)] border border-cyan-500/20 transition-all duration-300">
-              
+
               <div className="mb-10 text-center">
                 <div className="inline-block px-3 py-1 mb-4 border border-cyan-500/30 bg-cyan-500/5 rounded text-[10px] font-label-caps text-cyan-400 uppercase tracking-[0.3em] transition-all">
                   {getStepTitle()}
@@ -232,7 +246,7 @@ export default function Login() {
               )}
 
               <form onSubmit={handleSubmit} className="space-y-8">
-                
+
                 {(step === 'login' || step === 'forgot_password') && (
                   <div className="relative">
                     <label className="font-label-caps text-[10px] text-cyan-400/80 mb-2 block uppercase tracking-widest">
@@ -337,7 +351,7 @@ export default function Login() {
                       boxShadow: isLoading ? '0 0 20px rgba(0,240,255,0.2)' : '0 0 20px rgba(0,240,255,0.4)',
                     }}
                   >
-                    {isLoading ? 'PROCESSING...' : 
+                    {isLoading ? 'PROCESSING...' :
                      step === 'login' ? 'INITIATE NEURAL LINK' :
                      step === 'verify_code' ? 'VERIFY ACCESS CODE' :
                      step === 'forgot_password' ? 'DISPATCH RECOVERY CIPHER' :
@@ -352,6 +366,7 @@ export default function Login() {
                       onClick={() => {
                         setStep('login');
                         setCode('');
+                        setResetToken('');
                         handleResetState();
                       }}
                       className="w-full py-2 text-cyan-400/70 hover:text-cyan-300 font-label-caps text-[10px] uppercase transition-colors"

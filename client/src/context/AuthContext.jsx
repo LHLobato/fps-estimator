@@ -1,5 +1,6 @@
 import { createContext, useState, useEffect } from 'react';
 import * as authAPI from '../api/auth';
+import api from '../api/config';
 
 export const AuthContext = createContext();
 
@@ -12,19 +13,9 @@ export function AuthProvider({ children }) {
   // Verificar autenticação ao montar
   useEffect(() => {
     const checkAuth = async () => {
-      const token = localStorage.getItem('access_token');
-      console.log('[AUTH] Iniciando verificação de autenticação...', { token: !!token });
-      
-      if (!token) {
-        console.log('[AUTH] Nenhum token encontrado');
-        setIsAuthenticated(false);
-        setLoading(false);
-        return;
-      }
-
       try {
+        await authAPI.refresh_token();
         console.log('[AUTH] Token encontrado, verificando com /auth/me...');
-        const api = (await import('../api/config')).default;
         const userData = await api.get('/auth/me');
         console.log('[AUTH] ✅ Autenticação verificada:', userData.data);
         setUser(userData.data);
@@ -32,8 +23,6 @@ export function AuthProvider({ children }) {
         setError('');
       } catch (err) {
         console.error('[AUTH] ❌ Falha ao verificar autenticação:', err.response?.status, err.response?.data);
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('refresh_token');
         setIsAuthenticated(false);
         setUser(null);
       } finally {
@@ -44,8 +33,17 @@ export function AuthProvider({ children }) {
     checkAuth();
   }, []);
 
+  useEffect(() => {
+    const expireSession = () => {
+      setUser(null);
+      setIsAuthenticated(false);
+    };
+
+    window.addEventListener('auth:session-expired', expireSession);
+    return () => window.removeEventListener('auth:session-expired', expireSession);
+  }, []);
+
   const login = async (email, password) => {
-    setLoading(true);
     setError('');
     try {
       const response = await authAPI.login({ email, password });
@@ -54,44 +52,45 @@ export function AuthProvider({ children }) {
       const errorMessage = err.response?.data?.detail || err.message || 'Erro ao fazer login';
       setError(errorMessage);
       throw err;
-    } finally {
-      setLoading(false);
     }
   };
 
   const handleVerifyCode = async (email, code) => {
-    setLoading(true);
     setError('');
     try {
       const response = await authAPI.verify_code_login({ email, code });
       if (response.access_token) {
-        localStorage.setItem('access_token', response.access_token);
-        if (response.refresh_token) {
-          localStorage.setItem('refresh_token', response.refresh_token);
-        }
-        
-        // Obter dados do usuário
-        const api = (await import('../api/config')).default;
-        const userData = await api.get('/auth/me');
-        setUser(userData.data);
+        // O JWT já foi armazenado por verify_code_login. A autenticação não
+        // deve depender de uma segunda requisição para carregar o perfil.
         setIsAuthenticated(true);
+
+        try {
+          const userData = await api.get('/auth/me');
+          setUser(userData.data);
+        } catch (profileError) {
+          console.error('[AUTH] Sessão iniciada, mas não foi possível carregar o perfil:', profileError);
+          setUser(null);
+        }
+
         return response;
       }
+
+      throw new Error('Token de acesso não recebido após a verificação');
     } catch (err) {
       const errorMessage = err.response?.data?.detail || err.message || 'Erro na verificação';
       setError(errorMessage);
       throw err;
-    } finally {
-      setLoading(false);
     }
   };
 
-  const logout = () => {
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('refresh_token');
-    setUser(null);
-    setIsAuthenticated(false);
-    setError('');
+  const logout = async () => {
+    try {
+      await authAPI.logout();
+    } finally {
+      setUser(null);
+      setIsAuthenticated(false);
+      setError('');
+    }
   };
 
   return (

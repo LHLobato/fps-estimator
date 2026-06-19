@@ -1,4 +1,4 @@
-import { Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
+import { Routes, Route, Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import Home from './pages/Home';
 import Estimate from './pages/Estimate';
 import User from './pages/User';
@@ -20,9 +20,14 @@ function AppLayout() {
     { path: '/user', label: 'Profile', icon: 'fingerprint' },
   ];
 
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch (error) {
+      console.error('[AUTH] Falha ao encerrar a sessão no servidor:', error);
+    } finally {
+      navigate('/login', { replace: true });
+    }
   };
 
   return (
@@ -131,7 +136,6 @@ function AppLayout() {
 
 function App() {
   const location = useLocation();
-  const navigate = useNavigate();
   const { isAuthenticated, loading } = useAuth();
 
   // Se ainda está carregando, mostrar loading
@@ -148,8 +152,7 @@ function App() {
 
   // Se estiver em /login ou /signup e JÁ está autenticado, redirecionar para /
   if ((location.pathname === '/login' || location.pathname === '/signup') && isAuthenticated) {
-    navigate('/', { replace: true });
-    return null;
+    return <Navigate to="/" replace />;
   }
 
   // Se estiver em /login ou /signup e NÃO está autenticado, mostrar sem layout

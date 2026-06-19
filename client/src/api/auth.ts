@@ -1,14 +1,16 @@
-import api from "./config";
-
-// --- INTERFACES (Alinhadas com schemas.py) ---
+import api, {
+  clearAccessToken,
+  refreshAccessToken,
+  setAccessToken,
+} from "./config";
 
 export interface UserCreateSchema {
   email: string;
   password: string;
   name?: string;
   profile_photo?: string;
-  gpu: string; 
-  cpu: string; 
+  gpu: string;
+  cpu: string;
   ram: string;
 }
 
@@ -33,14 +35,9 @@ export interface SignupResponse extends DefaultResponse {
 
 export interface AuthResponse {
   access_token: string;
-  refresh_token?: string;
   token_type: string;
   user_id?: string;
   message?: string;
-}
-
-export interface RefreshTokenRequest {
-  refresh_token: string;
 }
 
 export interface UserBase {
@@ -63,53 +60,51 @@ export interface UserResponse {
   ram?: string;
 }
 
-// --- FUNÇÕES DE API (Alinhadas com auth_router.py) ---
-
-// Criar nova conta (requer GPU, CPU, RAM)
 export async function sign_in(userData: UserCreateSchema): Promise<SignupResponse> {
   const response = await api.post<SignupResponse>("/auth/sign_in", userData);
   return response.data;
 }
 
-// Verificar código OTP de signup
 export async function verify_code_sign(userData: CodeSchema): Promise<AuthResponse> {
   const response = await api.post<AuthResponse>("/auth/verify_code_sig", userData);
+  setAccessToken(response.data.access_token);
   return response.data;
 }
 
-// Login (envia OTP por email)
 export async function login(userData: LoginSchema): Promise<DefaultResponse> {
   const response = await api.post<DefaultResponse>("/auth/login", userData);
   return response.data;
 }
 
-// Verificar código OTP de login
 export async function verify_code_login(userData: CodeSchema): Promise<AuthResponse> {
   const response = await api.post<AuthResponse>("/auth/verify_code_log", userData);
+  setAccessToken(response.data.access_token);
   return response.data;
 }
 
-// Renovar access_token usando refresh_token
-export async function refresh_token(
-  body: RefreshTokenRequest,
-): Promise<AuthResponse> {
-  const response = await api.post<AuthResponse>("/auth/refresh_token", body);
-  return response.data;
+export async function refresh_token(): Promise<AuthResponse> {
+  const access_token = await refreshAccessToken();
+  return { access_token, token_type: "bearer" };
 }
 
-// Obter dados do usuário logado (Requer Autenticação)
 export async function get_current_user(): Promise<UserResponse> {
   const response = await api.get<UserResponse>("/auth/me");
   return response.data;
 }
 
-// Solicitar recuperação de senha (envia OTP por email)
+export async function logout(): Promise<void> {
+  try {
+    await api.post("/auth/logout");
+  } finally {
+    clearAccessToken();
+  }
+}
+
 export async function forgot_password(userData: UserBase): Promise<DefaultResponse> {
   const response = await api.post<DefaultResponse>("/auth/forgotpassword", userData);
   return response.data;
 }
 
-// Verificar código de recuperação de senha
 export async function verify_recovery_code(
   userData: CodeSchema,
 ): Promise<{ reset_token: string }> {
@@ -120,7 +115,6 @@ export async function verify_recovery_code(
   return response.data;
 }
 
-// Resetar senha com token
 export async function reset_password(
   userData: PasswordResetSchema,
 ): Promise<AuthResponse> {
@@ -128,5 +122,6 @@ export async function reset_password(
     "/auth/change_password",
     userData,
   );
+  setAccessToken(response.data.access_token);
   return response.data;
 }

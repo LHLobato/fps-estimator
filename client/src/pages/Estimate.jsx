@@ -9,6 +9,14 @@ import { useGameSearch } from '../hooks/useGameSearch';
 import { useCpuSearch, useGpuSearch } from '../hooks/useHardwareSearch';
 import { filterRamOptions } from '../utils/filterRam';
 
+const getValidImageUrl = (url) => {
+  if (!url || typeof url !== 'string') return null;
+  const clean = url.trim();
+  if (['', 'null', 'none', 'undefined'].includes(clean.toLowerCase())) return null;
+  if (clean.startsWith('//')) return `https:${clean}`;
+  return clean;
+};
+
 export default function Estimate() {
   const [selectedGame, setSelectedGame] = useState('');
   const [selectedGameId, setSelectedGameId] = useState('');
@@ -23,11 +31,9 @@ export default function Estimate() {
   const [gpuSearch, setGpuSearch] = useState('');
   const [ramSearch, setRamSearch] = useState('');
 
-  // Começa vazio, será preenchido pelo backend
   const [recentEstimates, setRecentEstimates] = useState([]);
 
   useEffect(() => {
-    // 1. Carrega Hardware do Usuário
     const loadUserHardware = async () => {
       try {
         const user = await userAPI.get_current_user();
@@ -41,7 +47,6 @@ export default function Estimate() {
       }
     };
 
-    // 2. Carrega as últimas 3 estimativas
     const loadGlobalRecent = async () => {
       try {
         const response = await gamesAPI.get_recent_global();
@@ -79,7 +84,6 @@ export default function Estimate() {
   const { results: gpuSearchResults, loading: gpuSearchLoading } = useGpuSearch(gpuSearch, 10);
   const filteredRams = filterRamOptions(rams, ramSearch, 10);
 
-  // Submeter formulário
   const handleEstimate = async (e) => {
     e.preventDefault();
 
@@ -103,11 +107,9 @@ export default function Estimate() {
         ram: selectedRAM,
       };
 
-      // 1. Calcula o FPS usando a API
       const data = await llmAPI.estimate_fps(estimateData);
       setResult(data);
 
-      // 2. Tenta salvar o resultado na Neural Library do usuário
       try {
         await gamesAPI.add_user_game({
           game_id: selectedGameId, 
@@ -122,7 +124,6 @@ export default function Estimate() {
         console.error("Error saving to library:", saveErr.response?.data || saveErr.message);
       }
 
-      // 3. Atualiza o histórico visual da sessão atual (Empurra para o topo e mantém máx 3)
       setRecentEstimates((prev) => {
         const newEstimate = {
           id: Date.now(),
@@ -131,7 +132,6 @@ export default function Estimate() {
           fps: Math.round(data.avg_fps) || 0,
           color: 'cyan',
         };
-        // Mantém apenas os 2 mais recentes anteriores para formar 3 totais
         return [newEstimate, ...prev.slice(0, 2)];
       });
       
@@ -147,7 +147,6 @@ export default function Estimate() {
 
   return (
     <div className="w-full">
-      {/* HERO HEADER */}
       <div className="mb-8">
         <h2 className="font-headline-xl text-white tracking-tighter mb-2">
           PERFORMANCE{' '}
@@ -161,7 +160,6 @@ export default function Estimate() {
       </div>
 
       <DashboardGrid>
-        {/* RESULTADO DA ESTIMATIVA (Ocupa 4 colunas na esquerda) */}
         <div className="col-span-12 lg:col-span-4">
           <GlassCard title="ESTIMATED_FPS" className="relative h-full">
             <div className="absolute top-0 left-0 w-1 h-full bg-cyan-500"></div>
@@ -195,13 +193,11 @@ export default function Estimate() {
           </GlassCard>
         </div>
 
-        {/* BENTO INPUT FORM (Ocupa 8 colunas na direita) */}
         <div className="col-span-12 lg:col-span-8">
           <GlassCard title="HARDWARE_SPECIFICATIONS" className="relative">
             <div className="absolute top-0 left-0 w-1 h-full bg-cyan-500"></div>
             <form onSubmit={handleEstimate} className="grid grid-cols-1 md:grid-cols-2 gap-8">
               
-              {/* Game Selection (COM CAPAS) */}
               <div className="col-span-1 md:col-span-2">
                 <label className="block font-label-caps text-[12px] text-cyan-500 mb-2">
                   TARGET_GAME_IDENTIFIER
@@ -216,49 +212,57 @@ export default function Estimate() {
                   />
                   {gameSearchLoading && <p className="text-xs text-slate-500 mt-2">Searching the database...</p>}
                   
-                  {/* DROPDOWN COM IMAGENS */}
                   {gameSearch && !gameSearchLoading && gameSearchResults.length > 0 && (
                     <div className="absolute top-full left-0 right-0 bg-slate-900 border border-cyan-500/40 rounded mt-2 max-h-64 overflow-y-auto z-50 shadow-2xl">
-                      {gameSearchResults.map((game) => (
-                        <button
-                          key={game.id}
-                          type="button"
-                          onClick={() => { 
-                            setSelectedGame(game.name); 
-                            setSelectedGameId(game.id); // Guardando o ID único
-                            setSelectedGameImage(game.image_url);
-                            setGameSearch(''); 
-                          }}
-                          className="w-full px-4 py-2 text-left hover:bg-cyan-500/20 transition-colors border-b border-white/5 flex items-center gap-3 group"
-                        >
-                          {game.image_url ? (
-                            <img src={game.image_url} alt={game.name} className="w-8 h-10 object-cover rounded opacity-80 group-hover:opacity-100" />
-                          ) : (
-                            <div className="w-8 h-10 bg-slate-800 rounded flex items-center justify-center">
-                              <span className="material-symbols-outlined text-[16px] text-slate-500">image</span>
+                      {gameSearchResults.map((game) => {
+                        const imgUrl = getValidImageUrl(game.image_url);
+                        
+                        return (
+                          <button
+                            key={game.id}
+                            type="button"
+                            onClick={() => { 
+                              setSelectedGame(game.name); 
+                              setSelectedGameId(game.id);
+                              setSelectedGameImage(imgUrl);
+                              setGameSearch(''); 
+                            }}
+                            className="w-full px-4 py-2 text-left hover:bg-cyan-500/20 transition-colors border-b border-white/5 flex items-center gap-3 group"
+                          >
+                            {/* O Truque do Overlay aqui para o dropdown */}
+                            <div className="w-8 h-10 bg-slate-800 rounded flex items-center justify-center shrink-0 relative overflow-hidden">
+                              <span className="material-symbols-outlined text-[16px] text-slate-500 absolute z-0">image</span>
+                              {imgUrl && (
+                                <img 
+                                  src={imgUrl} 
+                                  alt={game.name} 
+                                  className="w-full h-full object-cover opacity-80 group-hover:opacity-100 relative z-10" 
+                                  onError={(e) => e.currentTarget.style.display = 'none'}
+                                />
+                              )}
                             </div>
-                          )}
-                          <span className="text-sm text-cyan-300 group-hover:text-cyan-100">{game.name}</span>
-                        </button>
-                      ))}
+                            <span className="text-sm text-cyan-300 group-hover:text-cyan-100">{game.name}</span>
+                          </button>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
 
-                {/* CARTÃO DO JOGO SELECIONADO */}
                 {selectedGame && (
                   <div className="mt-4 flex items-center gap-4 p-4 bg-slate-900/50 border border-cyan-500/30 rounded-lg">
-                    {selectedGameImage ? (
-                      <img 
-                        src={selectedGameImage} 
-                        alt={selectedGame} 
-                        className="w-14 h-20 object-cover rounded shadow-[0_0_15px_rgba(0,240,255,0.2)]" 
-                      />
-                    ) : (
-                      <div className="w-14 h-20 bg-slate-800 rounded border border-white/10 flex items-center justify-center">
-                        <span className="material-symbols-outlined text-slate-500">sports_esports</span>
-                      </div>
-                    )}
+                    {/* O Truque do Overlay aqui para o card selecionado */}
+                    <div className="w-14 h-20 bg-slate-800 rounded border border-white/10 flex items-center justify-center shrink-0 relative overflow-hidden">
+                      <span className="material-symbols-outlined text-slate-500 absolute z-0">sports_esports</span>
+                      {selectedGameImage && (
+                        <img 
+                          src={selectedGameImage} 
+                          alt={selectedGame} 
+                          className="w-full h-full object-cover shadow-[0_0_15px_rgba(0,240,255,0.2)] relative z-10" 
+                          onError={(e) => e.currentTarget.style.display = 'none'}
+                        />
+                      )}
+                    </div>
                     <div>
                       <p className="font-label-caps text-[10px] text-cyan-500 mb-1 flex items-center gap-1">
                         <span className="material-symbols-outlined text-[12px]">check_circle</span>
@@ -270,7 +274,6 @@ export default function Estimate() {
                 )}
               </div>
 
-              {/* Graphics Preset */}
               <div>
                 <label className="block font-label-caps text-[12px] text-cyan-500 mb-4">
                   GRAPHICS_PRESET
@@ -293,7 +296,6 @@ export default function Estimate() {
                 </div>
               </div>
 
-              {/* Target Resolution */}
               <div>
                 <label className="block font-label-caps text-[12px] text-cyan-500 mb-4">
                   TARGET_RESOLUTION
@@ -316,7 +318,6 @@ export default function Estimate() {
                 </div>
               </div>
 
-              {/* CPU e GPU Components */}
               <HardwareSearchInput
                 label="PROCESSOR_UNIT (CPU)"
                 placeholder="Search for CPU model..."
@@ -339,7 +340,6 @@ export default function Estimate() {
                 onSelect={(name) => { setSelectedGPU(name); setGpuSearch(''); }}
               />
 
-              {/* Memory */}
               <div className="col-span-1 md:col-span-2">
                 <label className="block font-label-caps text-[12px] text-cyan-500 mb-2">
                   SYSTEM_MEMORY (RAM)
@@ -370,14 +370,12 @@ export default function Estimate() {
                 {selectedRAM && <p className="text-xs font-label-caps text-cyan-400 mt-3">✓ {selectedRAM}</p>}
               </div>
 
-              {/* Error Message */}
               {error && (
                 <div className="col-span-1 md:col-span-2 p-4 bg-red-900/20 border border-red-500/40 rounded text-red-400 text-sm font-label-caps">
                   {error}
                 </div>
               )}
 
-              {/* CTA Button */}
               <div className="col-span-1 md:col-span-2 pt-4">
                 <button
                   type="submit"
@@ -391,7 +389,6 @@ export default function Estimate() {
           </GlassCard>
         </div>
 
-        {/* HISTÓRICO DE ANÁLISES GLOBAIS */}
         <div className="col-span-12">
           <GlassCard title="COMMUNITY_RECENT_LOGS">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

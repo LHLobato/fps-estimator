@@ -7,152 +7,179 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-echo -e "${YELLOW}=== FPS Estimator - Backend + Frontend ===${NC}\n"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CLIENT_DIR="$SCRIPT_DIR/client"
+COMPOSE_FILE="$SCRIPT_DIR/docker-compose.yml"
+BACKEND_LOG="$SCRIPT_DIR/backend.log"
+FRONTEND_LOG="$SCRIPT_DIR/client/frontend.log"
 
-# Verificar se está no diretório correto
-if [ ! -d "fps_api" ] || [ ! -d "client" ]; then
-    echo -e "${RED}❌ Erro: Execute este script do diretório raiz do fps-estimator${NC}"
+FRONTEND_PID=""
+BACKEND_LOG_PID=""
+FRONTEND_PORT=""
+
+echo -e "${YELLOW}=== FPS Estimator - Backend Docker + Frontend Vite ===${NC}\n"
+
+cd "$SCRIPT_DIR" || exit 1
+
+if [ ! -f "$COMPOSE_FILE" ] || [ ! -d "$CLIENT_DIR" ]; then
+    echo -e "${RED}❌ Estrutura do projeto não encontrada.${NC}"
     exit 1
 fi
 
-# Variáveis
-BACKEND_PID=""
-FRONTEND_PID=""
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PARENT_DIR="$(dirname "$SCRIPT_DIR")"
-
-# Usar venv do projeto pai (fps-estimator está em /Projetos/fps-estimator e venv está em /Projetos/.venv)
-VENV_PYTHON="$PARENT_DIR/.venv/bin/python"
-
-# Se não encontrou, tentar no diretório do projeto
-if [ ! -f "$VENV_PYTHON" ]; then
-    VENV_PYTHON="$SCRIPT_DIR/venv/bin/python"
+if ! command -v docker > /dev/null 2>&1; then
+    echo -e "${RED}❌ Docker não encontrado.${NC}"
+    exit 1
 fi
 
-# Se ainda não encontrou, usar python do sistema
-if [ ! -f "$VENV_PYTHON" ]; then
-    VENV_PYTHON="python3"
+if ! docker info > /dev/null 2>&1; then
+    echo -e "${RED}❌ O Docker não está rodando ou você não tem permissão.${NC}"
+    exit 1
 fi
 
-# Função para limpar processos ao sair
-cleanup() {
-    echo -e "\n${YELLOW}Encerrando serviços...${NC}"
-    if [ -n "$BACKEND_PID" ] && kill -0 $BACKEND_PID 2>/dev/null; then
-        kill $BACKEND_PID 2>/dev/null
-        echo -e "${GREEN}✓ Backend encerrado${NC}"
+if ! command -v npm > /dev/null 2>&1; then
+    echo -e "${RED}❌ npm não encontrado.${NC}"
+    exit 1
+fi
+
+is_port_open() {
+    local port="$1"
+    if lsof -tiTCP:"$port" -sTCP:LISTEN > /dev/null 2>&1; then
+        return 0
     fi
-    if [ -n "$FRONTEND_PID" ] && kill -0 $FRONTEND_PID 2>/dev/null; then
-        kill $FRONTEND_PID 2>/dev/null
-        echo -e "${GREEN}✓ Frontend encerrado${NC}"
-    fi
-    # Limpar portas (opcional)
-    kill -9 $(lsof -ti:8000) 2>/dev/null
-    kill -9 $(lsof -ti:5174) 2>/dev/null
-    exit 0
+    return 1
 }
 
-# Trap para capturar Ctrl+C
-trap cleanup SIGINT SIGTERM EXIT
-
-# Função para aguardar porta ficar disponível
-wait_for_port() {
-    local port=$1
+wait_for_http() {
+    local url="$1"
+    local label="$2"
     local max_attempts=60
-    local attempt=0
-    
-    echo -e "${BLUE}  ⏳ Aguardando porta $port ficar disponível...${NC}"
-    
-    while [ $attempt -lt $max_attempts ]; do
-        if timeout 2 bash -c "echo > /dev/tcp/127.0.0.1/$port" 2>/dev/null; then
-            sleep 2  # Aguardar mais um pouco pra ter certeza
-            echo -e "${GREEN}  ✓ Porta $port está respondendo!${NC}"
+    local attempt=1
+
+    while [ "$attempt" -le "$max_attempts" ]; do
+        if curl --silent --fail "$url" > /dev/null 2>&1; then
+            echo -e "${GREEN}✓ $label disponível em $url${NC}"
             return 0
         fi
         sleep 1
         attempt=$((attempt + 1))
-        if [ $((attempt % 10)) -eq 0 ]; then
-            echo -ne "  ⏳ Tentativa $attempt/$max_attempts\r"
-        fi
     done
-    
-    echo -e "\n${RED}  ❌ Timeout aguardando porta $port${NC}"
+
+    echo -e "${RED}❌ Timeout aguardando $label em $url${NC}"
     return 1
 }
 
-# Função para aguardar múltiplas portas
-wait_for_frontend() {
-    echo -e "${BLUE}  ⏳ Aguardando Frontend (5173-5176)...${NC}"
+wait_for_port() {
+    local port="$1"
+    local label="$2"
     local max_attempts=60
-    local attempt=0
-    
-    while [ $attempt -lt $max_attempts ]; do
+    local attempt=1
+
+    while [ "$attempt" -le "$max_attempts" ]; do
+        if is_port_open "$port"; then
+            echo -e "${GREEN}✓ $label disponível na porta $port${NC}"
+            return 0
+        fi
+        sleep 1
+        attempt=$((attempt + 1))
+    done
+
+    echo -e "${RED}❌ Timeout aguardando $label na porta $port${NC}"
+    return 1
+}
+
+wait_for_frontend() {
+    local max_attempts=60
+    local attempt=1
+    local port
+
+    while [ "$attempt" -le "$max_attempts" ]; do
         for port in 5173 5174 5175 5176; do
-            if timeout 2 bash -c "echo > /dev/tcp/127.0.0.1/$port" 2>/dev/null; then
-                sleep 2  # Aguardar mais um pouco
-                echo -e "${GREEN}  ✓ Frontend respondendo na porta $port!${NC}"
+            if is_port_open "$port"; then
+                FRONTEND_PORT="$port"
+                echo -e "${GREEN}✓ Frontend disponível na porta $FRONTEND_PORT${NC}"
                 return 0
             fi
         done
         sleep 1
         attempt=$((attempt + 1))
-        if [ $((attempt % 10)) -eq 0 ]; then
-            echo -ne "  ⏳ Tentativa $attempt/$max_attempts\r"
-        fi
     done
-    
-    echo -e "\n${RED}  ❌ Timeout aguardando Frontend${NC}"
+
+    echo -e "${RED}❌ Timeout aguardando o frontend${NC}"
     return 1
 }
 
-# Matar processos antigos nas portas
-echo -e "${YELLOW}▶ Limpando portas 8000 e 5174...${NC}"
-kill -9 $(lsof -ti:8000) 2>/dev/null && echo -e "${GREEN}  ✓ Porta 8000 liberada${NC}"
-kill -9 $(lsof -ti:5174) 2>/dev/null && echo -e "${GREEN}  ✓ Porta 5174 liberada${NC}"
-sleep 1
+cleanup() {
+    local exit_code=$?
 
-# Iniciar Backend
-echo -e "\n${YELLOW}▶ Iniciando Backend (FastAPI)...${NC}"
-cd "$SCRIPT_DIR"
-$VENV_PYTHON -m uvicorn fps_api.app:app --reload --host 0.0.0.0 --port 8000 > backend.log 2>&1 &
-BACKEND_PID=$!
-echo -e "${GREEN}  ✓ Backend iniciado (PID: $BACKEND_PID)${NC}"
+    trap - SIGINT SIGTERM EXIT
 
-# Aguardar backend ficar pronto
-if wait_for_port 8000; then
-    echo -e "  📍 http://localhost:8000"
-    echo -e "  📚 Docs: http://localhost:8000/docs\n"
-else
-    echo -e "${RED}❌ Backend não respondeu em tempo hábil${NC}"
-    echo -e "${BLUE}Veja o log: backend.log${NC}"
-    echo -e "${BLUE}Comando manual: python -m uvicorn fps_api.app:app --reload --port 8000${NC}"
+    echo -e "\n${YELLOW}Encerrando serviços...${NC}"
+
+    if [ -n "$FRONTEND_PID" ] && kill -0 "$FRONTEND_PID" 2>/dev/null; then
+        kill "$FRONTEND_PID" 2>/dev/null
+        wait "$FRONTEND_PID" 2>/dev/null
+        echo -e "${GREEN}✓ Frontend encerrado${NC}"
+    fi
+
+    if [ -n "$BACKEND_LOG_PID" ] && kill -0 "$BACKEND_LOG_PID" 2>/dev/null; then
+        kill "$BACKEND_LOG_PID" 2>/dev/null
+        wait "$BACKEND_LOG_PID" 2>/dev/null
+    fi
+
+    docker compose down > /dev/null 2>&1
+    echo -e "${GREEN}✓ Backend Docker encerrado${NC}"
+
+    exit "$exit_code"
+}
+
+trap cleanup SIGINT SIGTERM EXIT
+
+if is_port_open 8000; then
+    echo -e "${RED}❌ A porta 8000 já está em uso.${NC}"
+    echo -e "${BLUE}Libere a porta ou pare o processo atual antes de rodar o script.${NC}"
     exit 1
 fi
 
-# Iniciar Frontend
-echo -e "${YELLOW}▶ Iniciando Frontend (Vite)...${NC}"
-cd "$SCRIPT_DIR/client"
-npm run dev > frontend.log 2>&1 &
+echo -e "${YELLOW}▶ Preparando backend Docker...${NC}"
+docker compose down > /dev/null 2>&1
+
+echo -e "${YELLOW}▶ Iniciando backend no Docker...${NC}"
+if ! docker compose up --build -d api; then
+    echo -e "${RED}❌ Falha ao subir o backend com Docker.${NC}"
+    exit 1
+fi
+
+: > "$BACKEND_LOG"
+docker compose logs -f api > "$BACKEND_LOG" 2>&1 &
+BACKEND_LOG_PID=$!
+
+if ! wait_for_http "http://localhost:8000/health" "Backend"; then
+    echo -e "${BLUE}Veja o log em: $BACKEND_LOG${NC}"
+    exit 1
+fi
+
+echo -e "\n${YELLOW}▶ Iniciando frontend com Vite...${NC}"
+cd "$CLIENT_DIR" || exit 1
+npm run dev > "$FRONTEND_LOG" 2>&1 &
 FRONTEND_PID=$!
-echo -e "${GREEN}  ✓ Frontend iniciado (PID: $FRONTEND_PID)${NC}"
+cd "$SCRIPT_DIR" || exit 1
 
-# Aguardar frontend ficar pronto
-if wait_for_frontend; then
-    echo -e "  📍 http://localhost:5173 ou http://localhost:5174\n"
-else
-    echo -e "${RED}❌ Frontend não respondeu em tempo hábil${NC}"
-    echo -e "${BLUE}Veja o log: client/frontend.log${NC}"
-    echo -e "${BLUE}Comando manual: cd client && npm run dev${NC}"
+if ! wait_for_frontend; then
+    echo -e "${BLUE}Veja o log em: $FRONTEND_LOG${NC}"
     exit 1
 fi
 
-# Sistema pronto
-echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "\n${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${GREEN}✓ Sistema pronto!${NC}"
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
-echo -e "📋 Logs disponíveis em:"
-echo -e "  ${YELLOW}Backend:${NC}  $SCRIPT_DIR/backend.log"
-echo -e "  ${YELLOW}Frontend:${NC} $SCRIPT_DIR/client/frontend.log\n"
+echo -e " 📍 Backend:  http://localhost:8000"
+echo -e " 📚 Docs:     http://localhost:8000/docs"
+echo -e " 📍 Frontend: http://localhost:$FRONTEND_PORT"
+echo
+echo -e " 📄 Logs:"
+echo -e "    Backend:  $BACKEND_LOG"
+echo -e "    Frontend: $FRONTEND_LOG"
+echo
 echo -e "⏹️  Pressione ${YELLOW}Ctrl+C${NC} para parar tudo.\n"
 
-# Aguardar indefinidamente
-wait
+wait "$FRONTEND_PID"

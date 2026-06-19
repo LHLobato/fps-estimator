@@ -112,13 +112,9 @@ export default function SignUp() {
           code
         });
 
-        localStorage.setItem('access_token', response.access_token);
-        if (response.refresh_token) {
-          localStorage.setItem('refresh_token', response.refresh_token);
-        }
 
         setSuccess('Account created successfully! Redirecting...');
-        
+
         setTimeout(() => {
           window.location.href = '/';
         }, 800);
@@ -215,8 +211,8 @@ export default function SignUp() {
                 </div>
                 <h1 className="font-headline-lg text-primary-fixed mb-2 uppercase tracking-tighter">FPS_CORE</h1>
                 <p className="text-on-surface-variant text-sm font-body-md opacity-70">
-                  {step === 'register' 
-                    ? 'Initialize your neural node connection.' 
+                  {step === 'register'
+                    ? 'Initialize your neural node connection.'
                     : 'Enter the verification code sent to your email.'}
                 </p>
               </div>
@@ -448,10 +444,10 @@ export default function SignUp() {
                     onMouseDown={(e) => !isLoading && (e.currentTarget.style.transform = 'scale(0.98)')}
                     onMouseUp={(e) => !isLoading && (e.currentTarget.style.transform = 'scale(1)')}
                   >
-                    {isLoading 
-                      ? 'INITIALIZING...' 
-                      : step === 'register' 
-                        ? 'CREATE ACCOUNT' 
+                    {isLoading
+                      ? 'INITIALIZING...'
+                      : step === 'register'
+                        ? 'CREATE ACCOUNT'
                         : 'VERIFY CODE'}
                   </button>
                 </div>

@@ -17,7 +17,7 @@ export interface AddGameUserSchema {
 export interface GameSchema {
   game_name: string; // Vem do JOIN
   game_id: string; // UUID
-  image_url?; string;
+  image_url?: string;
   avg_fps: number;
   min_fps: number;
   max_fps: number;

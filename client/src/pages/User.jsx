@@ -6,6 +6,15 @@ import { useCpuSearch, useGpuSearch } from '../hooks/useHardwareSearch';
 import { filterRamOptions } from '../utils/filterRam';
 import * as gamesAPI from '../api/games';
 
+// Helper blindado de URL!
+const getValidImageUrl = (url) => {
+  if (!url || typeof url !== 'string') return null;
+  const clean = url.trim();
+  if (['', 'null', 'none', 'undefined'].includes(clean.toLowerCase())) return null;
+  if (clean.startsWith('//')) return `https:${clean}`;
+  return clean;
+};
+
 export default function User() {
   const [userData, setUserData] = useState(null);
   const navigate = useNavigate();
@@ -23,12 +32,10 @@ export default function User() {
     '128GB DDR3', '64GB DDR3', '32GB DDR3', '16GB DDR3', '8GB DDR3', '4GB DDR3',
   ]);
 
-  // Estado de busca
   const [cpuSearch, setCpuSearch] = useState('');
   const [gpuSearch, setGpuSearch] = useState('');
   const [ramSearch, setRamSearch] = useState('');
 
-  // Estado dos jogos
   const [games, setGames] = useState([]);
   const [userGames, setUserGames] = useState([]);
   const [loadingUser, setLoadingUser] = useState(true);
@@ -36,7 +43,6 @@ export default function User() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  // Carregar dados do usuário e hardware
   useEffect(() => {
     const loadData = async () => {
       try {
@@ -53,7 +59,6 @@ export default function User() {
           ram: user.ram || ''
         });
 
-        // Processar jogos globais para uso no fallback
         if (gamesList.games && Array.isArray(gamesList.games)) {
           setGames(gamesList.games);
         }
@@ -68,7 +73,6 @@ export default function User() {
     loadData();
   }, []);
 
-  // Carregar jogos do usuário
   useEffect(() => {
     const loadUserGames = async () => {
       try {
@@ -214,7 +218,6 @@ export default function User() {
     );
   };
 
-  // Atualizar configuração do sistema
   const handleUpdateSystem = async () => {
     if (!systemConfig.cpu || !systemConfig.gpu || !systemConfig.ram) {
       setError('Preencha todos os campos de hardware');
@@ -241,14 +244,12 @@ export default function User() {
     }
   };
 
-  // Calcula a média de FPS baseada na biblioteca do usuário
   const avgLibraryFps = userGames.length > 0 
     ? Math.round(userGames.reduce((acc, curr) => acc + curr.avg_fps, 0) / userGames.length)
     : 0;
 
   return (
     <div className="w-full">
-      {/* Hero Title */}
       <div className="mb-10">
         <h1 className="font-headline-xl text-cyan-400 mb-2 uppercase">Neural Library</h1>
         <p className="font-body-lg text-on-surface-variant max-w-2xl">
@@ -268,9 +269,7 @@ export default function User() {
         </div>
       )}
 
-      {/* Dashboard Bento Grid */}
       <div className="grid grid-cols-12 gap-gutter">
-        {/* Section 1: Current Rig Configuration (Editable) */}
         <section className="col-span-12 lg:col-span-8 glass-panel rounded-xl overflow-hidden flex flex-col">
           <div className="header-bar px-6 py-4 flex justify-between items-center">
             <div className="flex items-center gap-3">
@@ -339,7 +338,6 @@ export default function User() {
           </div>
         </section>
 
-        {/* Section 3: Performance History */}
         <section className="col-span-12 lg:col-span-4 glass-panel rounded-xl overflow-hidden flex flex-col">
           <div className="header-bar px-6 py-4 flex items-center gap-3">
             <span className="material-symbols-outlined text-violet-400">history</span>
@@ -373,7 +371,6 @@ export default function User() {
               </div>
             </div>
 
-            {/* Nova Métrica: Média de FPS da Biblioteca */}
             <div className="mt-auto bg-slate-900/50 rounded p-4 border border-white/5">
               <p className="font-label-caps text-[10px] text-slate-500 mb-1">AVERAGE LIBRARY FPS</p>
               <div className="flex items-baseline gap-2">
@@ -391,7 +388,6 @@ export default function User() {
           </div>
         </section>
 
-        {/* Section 2: Your Neural Library (Gallery) */}
         <section className="col-span-12 glass-panel rounded-xl overflow-hidden">
           <div className="header-bar px-6 py-4 flex justify-between items-center">
             <div className="flex items-center gap-3">
@@ -413,46 +409,39 @@ export default function User() {
             </div>
           ) : userGames.length > 0 ? (
             <div className="p-gutter grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
-              {/* Game Cards - Jogos do Usuário */}
+              
               {userGames.map((game, idx) => {
-                // FALLBACK BLINDADO: Cruzamento local de dados
-                const catalogGame = games.find((g) => g.id === game.game_id);
+                // FALLBACK BLINDADO 
+                const catalogGame = games.find((g) => String(g.id).toLowerCase() === String(game.game_id).toLowerCase());
                 
-                // Pega a URL de onde estiver disponível, validando strings nulas
-                let finalImageUrl = game.image_url && game.image_url !== 'None' && game.image_url !== 'null'
-                  ? game.image_url 
-                  : (catalogGame?.image_url && catalogGame.image_url !== 'None' && catalogGame.image_url !== 'null'
-                      ? catalogGame.image_url
-                      : null);
-
-                // Força o HTTPS se a API tiver retornado links agnósticos (//...)
-                if (finalImageUrl && finalImageUrl.startsWith('//')) {
-                  finalImageUrl = `https:${finalImageUrl}`;
-                }
+                // O getValidImageUrl já limpa strings "null", "undefined", etc.
+                const finalImageUrl = getValidImageUrl(game.image_url) || getValidImageUrl(catalogGame?.image_url);
 
                 return (
                   <div
                     key={idx}
-                    onClick={() => navigate('/estimate')}
+                    onClick={() => navigate('/')}
                     className="group relative aspect-[3/4] rounded-lg overflow-hidden border border-cyan-500/40 hover:border-cyan-400 transition-all bg-slate-900 cursor-pointer"
                   >
-                    {finalImageUrl ? (
+                    {/* O Truque do CSS: Fallback Icon fixo atrás da imagem */}
+                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-800 z-0 p-4 text-center">
+                      <span className="material-symbols-outlined text-slate-600 mb-2 text-2xl">image_not_supported</span>
+                      <p className="text-slate-500 text-[10px] font-label-caps tracking-widest leading-relaxed">{game.game_name}</p>
+                    </div>
+
+                    {/* A imagem de verdade carrega por cima. Se falhar, ela fica invisível e o fundo aparece! */}
+                    {finalImageUrl && (
                       <img
-                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                        className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 z-10"
                         src={finalImageUrl}
                         alt={game.game_name}
                         onError={(e) => {
-                          e.target.style.display = 'none';
+                          e.currentTarget.style.display = 'none';
                         }}
                       />
-                    ) : (
-                      <div className="w-full h-full bg-slate-800 flex flex-col items-center justify-center text-center p-4">
-                        <span className="material-symbols-outlined text-slate-600 mb-2 text-2xl">image_not_supported</span>
-                        <p className="text-slate-500 text-[10px] font-label-caps tracking-widest">{game.game_name}</p>
-                      </div>
                     )}
                     
-                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent flex flex-col justify-end p-4">
+                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent flex flex-col justify-end p-4 z-20">
                       <span className="bg-cyan-500/20 text-cyan-400 border border-cyan-500/40 font-label-caps text-[8px] w-fit px-2 py-0.5 rounded-full mb-2 backdrop-blur-sm">
                         FPS: {game.avg_fps}
                       </span>
@@ -470,7 +459,6 @@ export default function User() {
                 );
               })}
 
-              {/* Placeholder para adicionar novo */}
               <button 
                 onClick={() => navigate('/')}
                 className="aspect-[3/4] rounded-lg border-2 border-dashed border-cyan-500/20 bg-cyan-500/5 flex flex-col items-center justify-center gap-4 hover:bg-cyan-500/10 hover:border-cyan-500/40 transition-all group"

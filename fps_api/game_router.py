@@ -79,7 +79,7 @@ async def include(request: Request, game_schema: AddGameUserSchema, user_id = De
 @limiter.limit("5/minute")
 async def user_list(request: Request, user_id = Depends(get_current_user_id), session: Session = Depends(get_session)):
     user_games = (
-        session.query(GameUser, Game.name.label("game_name"), Game.name.label("image_url"))
+        session.query(GameUser, Game.name.label("game_name"), Game.image_url.label("image_url"))
         .join(Game, Game.id == GameUser.game_id)
         .filter(GameUser.user_id == user_id)
         .all()

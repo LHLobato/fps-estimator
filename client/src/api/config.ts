@@ -1,9 +1,15 @@
 import axios, { AxiosInstance } from "axios";
+import {
+  clearAccessToken,
+  getAccessToken,
+  setAccessToken,
+} from "./token";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 const api: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
+  withCredentials: true,
   headers: {
     "Content-Type": "application/json",
   },
@@ -12,12 +18,9 @@ const api: AxiosInstance = axios.create({
 // Interceptador para adicionar token JWT aos headers
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem("access_token");
+    const token = getAccessToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
-      console.log('[API] Token adicionado ao request:', { url: config.url, token: token.slice(0, 20) + '...' });
-    } else {
-      console.log('[API] Nenhum token disponível para:', config.url);
     }
     return config;
   },
@@ -26,23 +29,64 @@ api.interceptors.request.use(
   }
 );
 
-// Interceptador para lidar com respostas
-api.interceptors.response.use(
-  (response) => {
-    return response;
-  },
-  (error) => {
-    // Se receber 401, limpar token e redirecionar para login
-    if (error.response?.status === 401) {
-      localStorage.removeItem("access_token");
-      localStorage.removeItem("refresh_token");
-      // Aqui você pode redirecionar para a página de login
-      // window.location.href = "/login";
-    }
-    return Promise.reject(error);
+const refreshClient = axios.create({
+  baseURL: API_BASE_URL,
+  withCredentials: true,
+  headers: { "Content-Type": "application/json" },
+});
+
+let refreshPromise: Promise<string> | null = null;
+
+export function refreshAccessToken(): Promise<string> {
+  if (!refreshPromise) {
+    refreshPromise = refreshClient
+      .post<{ access_token: string }>("/auth/refresh_token")
+      .then(({ data }) => {
+        setAccessToken(data.access_token);
+        return data.access_token;
+      })
+      .catch((error) => {
+        clearAccessToken();
+        throw error;
+      })
+      .finally(() => {
+        refreshPromise = null;
+      });
   }
+
+  return refreshPromise;
+}
+
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const originalRequest = error.config;
+    const url = originalRequest?.url || "";
+    const isAuthRequest = [
+      "/auth/login",
+      "/auth/verify_code_log",
+      "/auth/verify_code_sig",
+      "/auth/refresh_token",
+      "/auth/logout",
+    ].some((path) => url.includes(path));
+
+    if (error.response?.status !== 401 || originalRequest?._retry || isAuthRequest) {
+      return Promise.reject(error);
+    }
+
+    originalRequest._retry = true;
+    try {
+      const token = await refreshAccessToken();
+      originalRequest.headers.Authorization = `Bearer ${token}`;
+      return api(originalRequest);
+    } catch (refreshError) {
+      window.dispatchEvent(new Event("auth:session-expired"));
+      return Promise.reject(refreshError);
+    }
+  },
 );
 
+export { clearAccessToken, getAccessToken, setAccessToken };
 export default api;
 export { API_BASE_URL };
 
