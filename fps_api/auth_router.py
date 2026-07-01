@@ -476,7 +476,7 @@ async def logout(request: Request, response: Response):
 @auth_router.get(
     "/me", summary="Obter dados do usuário logado", response_model=UserResponse
 )
-@limiter.limit("5/minute")
+@limiter.limit("10/minute")
 async def get_current_user(
     request: Request,
     user_id: UUID = Depends(get_current_user_id),
