@@ -10,25 +10,34 @@ from fps_api.schemas import (
     GameListInfoSchema,
     GameInfoResponseSchema,
 )
-from sqlalchemy.orm import Session
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 from fps_api.build_db import Users, Game, GameUser
-# from model.text_func import retrieval_game_info  # Lazy import
 
 game_router = APIRouter(prefix="/games", tags=["games, analysis"])
 
+
 @game_router.get("/list")
 @limiter.limit("5/minute")
-async def list_games(request:Request, session:Session=Depends(get_session)):
+async def list_games(request: Request):
     return {"games": GAME_DF['name'].dropna().unique().tolist()}
+
 
 @game_router.post("/include")
 @limiter.limit("5/minute")
-async def include(request: Request, game_schema: AddGameUserSchema, user_id = Depends(get_current_user_id), session: Session = Depends(get_session)):
+async def include(
+    request: Request,
+    game_schema: AddGameUserSchema,
+    user_id=Depends(get_current_user_id),
+    session: AsyncSession = Depends(get_session),
+):
     try:
-        existing_entry = session.query(GameUser).filter(
+        stmt = select(GameUser).where(
             GameUser.user_id == user_id,
-            GameUser.game_id == game_schema.game_id
-        ).first()
+            GameUser.game_id == game_schema.game_id,
+        )
+        db_result = await session.execute(stmt)
+        existing_entry = db_result.scalars().first()
 
         if existing_entry:
             has_changes = (
@@ -47,8 +56,8 @@ async def include(request: Request, game_schema: AddGameUserSchema, user_id = De
                 existing_entry.avg_fps = game_schema.avg_fps
                 existing_entry.min_fps = game_schema.min_fps
                 existing_entry.max_fps = game_schema.max_fps
-                
-                session.commit()
+
+                await session.commit()
                 return {"status": "ok", "message": "game benchmark updated"}
             else:
                 return {"status": "ok", "message": "game benchmark already up to date"}
@@ -62,28 +71,33 @@ async def include(request: Request, game_schema: AddGameUserSchema, user_id = De
                 max_fps=game_schema.max_fps,
                 preset=game_schema.preset,
                 resolution=game_schema.resolution,
-                upscaling=game_schema.upscaling
+                upscaling=game_schema.upscaling,
             )
-            
+
             session.add(new_item)
-            session.commit()
+            await session.commit()
             return {"status": "ok", "message": "game inserted"}
 
     except Exception as e:
-        session.rollback()
-        print(f"Erro no /games/include: {e}") 
+        await session.rollback()
+        print(f"Erro no /games/include: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error")
 
 
 @game_router.get("/user_list", response_model=GameListSchema)
 @limiter.limit("5/minute")
-async def user_list(request: Request, user_id = Depends(get_current_user_id), session: Session = Depends(get_session)):
-    user_games = (
-        session.query(GameUser, Game.name.label("game_name"), Game.image_url.label("image_url"))
+async def user_list(
+    request: Request,
+    user_id=Depends(get_current_user_id),
+    session: AsyncSession = Depends(get_session),
+):
+    stmt = (
+        select(GameUser, Game.name.label("game_name"), Game.image_url.label("image_url"))
         .join(Game, Game.id == GameUser.game_id)
-        .filter(GameUser.user_id == user_id)
-        .all()
+        .where(GameUser.user_id == user_id)
     )
+    db_result = await session.execute(stmt)
+    user_games = db_result.all()
 
     return GameListSchema(
         status="ok",
@@ -106,18 +120,16 @@ async def user_list(request: Request, user_id = Depends(get_current_user_id), se
 
 @game_router.get("/all-info", response_model=GameListInfoSchema)
 @limiter.limit("10/minute")
-async def list_games_with_info(request: Request, session: Session = Depends(get_session)):
+async def list_games_with_info(request: Request, session: AsyncSession = Depends(get_session)):
     """
     Lista todos os jogos disponíveis com nome e URL da imagem.
 
     Returns:
         GameListInfoSchema com lista de jogos contendo id, name e image_url
     """
-    games = session.query(Game).with_entities(
-        Game.id,
-        Game.name,
-        Game.image_url
-    ).all()
+    stmt = select(Game.id, Game.name, Game.image_url)
+    db_result = await session.execute(stmt)
+    games = db_result.all()
 
     return GameListInfoSchema(
         status="ok",
@@ -138,7 +150,7 @@ async def list_games_with_info(request: Request, session: Session = Depends(get_
 async def get_game_info(
     request: Request,
     game_identifier: str,
-    session: Session = Depends(get_session)
+    session: AsyncSession = Depends(get_session)
 ):
     """
     Recupera informações de um jogo específico (nome e URL da imagem).
@@ -156,7 +168,7 @@ async def get_game_info(
     """
     # Lazy import para evitar sentence_transformers no startup
     from model.text_func import retrieval_game_info
-    
+
     game_info = await retrieval_game_info(game_identifier, session)
 
     return GameInfoResponseSchema(
@@ -164,18 +176,20 @@ async def get_game_info(
         game=GameInfoSchema(**game_info)
     )
 
+
 @game_router.get("/recent", response_model=GameListSchema)
 @limiter.limit("10/minute")
-async def recent_global_estimates(request: Request, session: Session = Depends(get_session)):
+async def recent_global_estimates(request: Request, session: AsyncSession = Depends(get_session)):
     """Busca as 3 últimas estimativas globais usando a ordenação nativa do banco."""
-    
-    recent_games = (
-        session.query(GameUser, Game.name.label("game_name"))
+
+    stmt = (
+        select(GameUser, Game.name.label("game_name"))
         .join(Game, Game.id == GameUser.game_id)
         .order_by(GameUser.updated_at.desc())
         .limit(3)
-        .all()
     )
+    db_result = await session.execute(stmt)
+    recent_games = db_result.all()
 
     return GameListSchema(
         status="ok",

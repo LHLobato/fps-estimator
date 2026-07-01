@@ -2,25 +2,39 @@
 Dependencies compartilhadas da API.
 Fornece sessões de banco de dados e verificação de tokens JWT.
 """
-
-from fps_api.auth_config import ALGORITHM, SECRET_KEY
-from fps_api.build_db import Users, db
-from fastapi import Depends, Header, HTTPException, status
-from jose import JWTError, jwt
-from sqlalchemy.orm import Session, sessionmaker
 from uuid import UUID
 
-def get_session():
-    """
-    Dependency que fornece uma sessão de banco de dados.
-    Garante que a sessão seja fechada após o uso.
-    """
-    try:
-        Session = sessionmaker(bind=db)
-        session = Session()
+from fastapi import Depends, Header, HTTPException, status
+from jose import JWTError, jwt
+from sqlalchemy.engine.url import make_url
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+
+from fps_api.auth_config import ALGORITHM, SECRET_KEY
+from fps_api.build_db import DATABASE_URL
+
+# asyncpg não aceita o parâmetro "sslmode" (sintaxe libpq/psycopg2) como kwarg de connect().
+# Removemos da URL e passamos o equivalente via connect_args com o nome que o asyncpg espera: "ssl".
+_url = make_url(DATABASE_URL)
+_query = dict(_url.query)
+_sslmode = _query.pop("sslmode", None)
+_url = _url.set(query=_query)
+
+_connect_args = {"statement_cache_size": 0}
+if _sslmode:
+    # asyncpg aceita os mesmos valores de sslmode ("require", "prefer", "verify-full", etc.)
+    # no parâmetro "ssl".
+    _connect_args["ssl"] = _sslmode
+
+engine = create_async_engine(
+    _url,
+    connect_args=_connect_args,
+)
+AsyncSessionLocal = async_sessionmaker(bind=engine, expire_on_commit=False)
+
+
+async def get_session():
+    async with AsyncSessionLocal() as session:
         yield session
-    finally:
-        session.close()
 
 
 def get_token_from_header(authorization: str = Header(...)) -> str:
@@ -65,5 +79,4 @@ def get_current_user_id(token_payload: dict = Depends(verify_token)) -> UUID:
     Dependency para extrair o ID do usuário do token JWT.
     Usada em rotas protegidas que precisam do user_id.
     """
-
     return UUID(token_payload["sub"])

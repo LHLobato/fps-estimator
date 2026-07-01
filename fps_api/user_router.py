@@ -1,6 +1,10 @@
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
+
 from fastapi import Request, APIRouter, HTTPException, Depends, status
-from sqlalchemy import text
-from sqlalchemy.orm import Session
+from sqlalchemy import select, text
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 from fps_api.schemas import (
     UserResponse,
     UserAlterSetup,
@@ -17,30 +21,43 @@ from uuid import UUID
 
 bcrypt_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
+# Thread pool dedicado para o bcrypt, que é lento de propósito (work factor) e
+# bloquearia o event loop se chamado direto dentro de uma rota async.
+_blocking_executor = ThreadPoolExecutor(max_workers=4)
+
+
+async def verify_password(password: str, hashed: str) -> bool:
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(_blocking_executor, bcrypt_context.verify, password, hashed)
+
 
 user_router = APIRouter(prefix="/profile", tags=["profile", "edit", "setup"])
+
 
 @user_router.post("/edit_setup", response_model=UserResponse)
 @limiter.limit("5/minute")
 async def edit_setup(
     request: Request,
     data: UserAlterSetup,
-    session: Session = Depends(get_session),
+    session: AsyncSession = Depends(get_session),
     user_id: UUID = Depends(get_current_user_id),
 ):
     # Lazy import para evitar sentence_transformers no startup
     from model.text_func import get_embedding
-    
-    user = session.query(Users).filter(Users.id == user_id).first()
+
+    stmt = select(Users).where(Users.id == user_id)
+    result = await session.execute(stmt)
+    user = result.scalars().first()
     if not user:
         raise HTTPException(status_code=404, detail="User not Found")
 
     if data.gpu:
         gpu_embedding = await get_embedding(data.gpu)
-        gpu_id = session.execute(
+        gpu_result = await session.execute(
             text("SELECT id FROM gpus ORDER BY embedding <=> CAST(:vec AS vector) LIMIT 1"),
             {"vec": str(gpu_embedding)}
-        ).scalar()
+        )
+        gpu_id = gpu_result.scalar()
         if gpu_id:
             user.gpu_id = gpu_id
         else:
@@ -48,10 +65,11 @@ async def edit_setup(
 
     if data.cpu:
         cpu_embedding = await get_embedding(data.cpu)
-        cpu_id = session.execute(
+        cpu_result = await session.execute(
             text("SELECT id FROM cpus ORDER BY embedding <=> CAST(:vec AS vector) LIMIT 1"),
             {"vec": str(cpu_embedding)}
-        ).scalar()
+        )
+        cpu_id = cpu_result.scalar()
         if cpu_id:
             user.cpu_id = cpu_id
         else:
@@ -60,8 +78,17 @@ async def edit_setup(
     if data.ram:
         user.ram = data.ram
 
-    session.commit()
-    session.refresh(user)
+    await session.commit()
+
+    # Recarrega com gpu_rel/cpu_rel via selectinload para montar a resposta:
+    # session.refresh() não garante reload seguro de relationships em contexto async.
+    stmt = (
+        select(Users)
+        .where(Users.id == user_id)
+        .options(selectinload(Users.gpu_rel), selectinload(Users.cpu_rel))
+    )
+    result = await session.execute(stmt)
+    user = result.scalars().first()
 
     return UserResponse(
         id=user.id,
@@ -79,37 +106,47 @@ async def edit_setup(
 async def edit_profile(
     request: Request,
     data: UserAlter,
-    session: Session = Depends(get_session),
+    session: AsyncSession = Depends(get_session),
     user_id: UUID = Depends(get_current_user_id),
 ):
     # Lazy import para evitar sentence_transformers no startup
     from model.text_func import get_embedding
-    
-    user = session.query(Users).filter(Users.id == user_id).first()
+
+    stmt = select(Users).where(Users.id == user_id)
+    result = await session.execute(stmt)
+    user = result.scalars().first()
     if not user:
         raise HTTPException(status_code=404, detail="User not Found")
-
 
     for field, value in data.model_dump(exclude_none=True).items():
 
         if field == "gpu":
             gpu_embedding = await get_embedding(value)
-            user.gpu_id = session.execute(
+            gpu_result = await session.execute(
                 text("SELECT id FROM gpus ORDER BY embedding <=> CAST(:vec AS vector) LIMIT 1"),
                 {"vec": str(gpu_embedding)}
-            ).scalar()
+            )
+            user.gpu_id = gpu_result.scalar()
         elif field == "cpu":
             cpu_embedding = await get_embedding(value)
-            user.cpu_id = session.execute(
+            cpu_result = await session.execute(
                 text("SELECT id FROM cpus ORDER BY embedding <=> CAST(:vec AS vector) LIMIT 1"),
                 {"vec": str(cpu_embedding)}
-            ).scalar()
+            )
+            user.cpu_id = cpu_result.scalar()
         else:
-
             setattr(user, field, value)
 
-    session.commit()
-    session.refresh(user)
+    await session.commit()
+
+    # Mesmo motivo do /edit_setup: recarrega com eager load em vez de refresh().
+    stmt = (
+        select(Users)
+        .where(Users.id == user_id)
+        .options(selectinload(Users.gpu_rel), selectinload(Users.cpu_rel))
+    )
+    result = await session.execute(stmt)
+    user = result.scalars().first()
 
     return UserResponse(
         id=user.id,
@@ -127,43 +164,45 @@ async def edit_profile(
 async def exclude_account(
     request: Request,
     data: ExcludeAccountRequest,
-    session: Session = Depends(get_session),
+    session: AsyncSession = Depends(get_session),
     user_id: UUID = Depends(get_current_user_id),
 ):
     """
     Endpoint para excluir (deletar) a conta do usuário.
-    
+
     Requer autenticação e confirmação de senha.
     Deleta completamente o usuário do banco de dados, incluindo dados relacionados.
-    
+
     Args:
         data: ExcludeAccountRequest com a senha para confirmação
-        session: Session do banco de dados
+        session: Sessão assíncrona do banco de dados
         user_id: ID do usuário autenticado
-        
+
     Returns:
         ExcludeAccountResponse com status e detalhes da exclusão
-        
+
     Raises:
         HTTPException: 404 se usuário não encontrado
         HTTPException: 401 se senha incorreta
     """
     # Buscar o usuário no banco de dados
-    user = session.query(Users).filter(Users.id == user_id).first()
+    stmt = select(Users).where(Users.id == user_id)
+    result = await session.execute(stmt)
+    user = result.scalars().first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    
+
     # Validar a senha
-    if not bcrypt_context.verify(data.password, user.password):
+    if not await verify_password(data.password, user.password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid password"
         )
-    
+
     # Deletar o usuário (cascade deleta os relacionamentos também)
-    session.delete(user)
-    session.commit()
-    
+    await session.delete(user)
+    await session.commit()
+
     return ExcludeAccountResponse(
         status="success",
         message="Account successfully deleted",

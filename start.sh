@@ -126,7 +126,7 @@ cleanup() {
         wait "$BACKEND_LOG_PID" 2>/dev/null
     fi
 
-    docker compose down > /dev/null 2>&1
+    docker-compose down > /dev/null 2>&1
     echo -e "${GREEN}✓ Backend Docker encerrado${NC}"
 
     exit "$exit_code"
@@ -141,16 +141,16 @@ if is_port_open 8000; then
 fi
 
 echo -e "${YELLOW}▶ Preparando backend Docker...${NC}"
-docker compose down > /dev/null 2>&1
+docker-compose down > /dev/null 2>&1
 
 echo -e "${YELLOW}▶ Iniciando backend no Docker...${NC}"
-if ! docker compose up --build -d api; then
+if ! docker-compose up --build -d api; then
     echo -e "${RED}❌ Falha ao subir o backend com Docker.${NC}"
     exit 1
 fi
 
 : > "$BACKEND_LOG"
-docker compose logs -f api > "$BACKEND_LOG" 2>&1 &
+docker-compose logs -f api > "$BACKEND_LOG" 2>&1 &
 BACKEND_LOG_PID=$!
 
 if ! wait_for_http "http://localhost:8000/health" "Backend"; then

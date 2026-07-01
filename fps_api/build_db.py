@@ -20,7 +20,7 @@ DB_USER = os.getenv("user")
 DB_PASS = os.getenv("pass")
 DB_NAME = os.getenv("dbname")
 
-DATABASE_URL = f"postgresql+psycopg2://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}?sslmode=require"
+DATABASE_URL = f"postgresql+asyncpg://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}?sslmode=require"
 db = create_engine(DATABASE_URL)
 Base = declarative_base()
 

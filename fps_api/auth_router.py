@@ -3,7 +3,8 @@ Router de autenticação - cadastro, login, verificação de email e tokens JWT.
 Implementa criptografia de senhas, JWT e verificação por email (OTP).
 """
 
-import time
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from uuid import UUID, uuid4
 
@@ -12,9 +13,9 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
-# from model.text_func import get_embedding  # Lazy import para evitar sentence_transformers no startup
-from sqlalchemy import text
-from sqlalchemy.orm import Session
+from sqlalchemy import select, text
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from fps_api.auth_config import (
     ACCESS_TOKEN_EXPIRE_MINUTES,
@@ -43,10 +44,26 @@ from fps_api.schemas import (
 
 bcrypt_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
+_blocking_executor = ThreadPoolExecutor(max_workers=4)
+
 auth_router = APIRouter(
     prefix="/auth",
     tags=["autenticação"],
 )
+
+
+async def _run_blocking(func, *args):
+    """Roda uma função síncrona bloqueante fora do event loop."""
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(_blocking_executor, func, *args)
+
+
+async def hash_password(password: str) -> str:
+    return await _run_blocking(bcrypt_context.hash, password)
+
+
+async def verify_password(password: str, hashed: str) -> bool:
+    return await _run_blocking(bcrypt_context.verify, password, hashed)
 
 
 def generate_token(
@@ -97,15 +114,17 @@ def clear_refresh_cookie(response: Response) -> None:
     )
 
 
-def authenticate_user(email: str, password: str, session: Session):
+async def authenticate_user(email: str, password: str, session: AsyncSession):
     """
     Verifica credenciais do usuário.
     Retorna o usuário se autenticado, None caso contrário.
     """
-    user = session.query(Users).filter(Users.email == email).first()
+    stmt = select(Users).where(Users.email == email)
+    db_result = await session.execute(stmt)
+    user = db_result.scalars().first()
     if not user:
         return None
-    if not bcrypt_context.verify(password, user.password):
+    if not await verify_password(password, user.password):
         return None
     return user
 
@@ -138,7 +157,7 @@ async def auth_home():
 async def create_account(
     request: Request,
     user_data: UserCreate,
-    session: Session = Depends(get_session),
+    session: AsyncSession = Depends(get_session),
 ):
     """
     Cria nova conta de usuário com email de verificação OTP.
@@ -152,7 +171,9 @@ async def create_account(
     from model.text_func import get_embedding
 
     # Verifica se email já existe
-    existing_user = session.query(Users).filter(Users.email == user_data.email).first()
+    existing_stmt = select(Users).where(Users.email == user_data.email)
+    existing_result = await session.execute(existing_stmt)
+    existing_user = existing_result.scalars().first()
     if existing_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -160,14 +181,15 @@ async def create_account(
         )
 
     gpu_embedding = await get_embedding(user_data.gpu)
-    gpu = session.execute(
+    gpu_result = await session.execute(
         text("""
             SELECT id FROM gpus
             ORDER BY embedding <=> CAST(:vec AS vector)
             LIMIT 1
         """),
         {"vec": str(gpu_embedding)},
-    ).scalar()
+    )
+    gpu = gpu_result.scalar()
 
     if not gpu:
         raise HTTPException(
@@ -175,14 +197,15 @@ async def create_account(
         )
 
     cpu_embedding = await get_embedding(user_data.cpu)
-    cpu = session.execute(
+    cpu_result = await session.execute(
         text("""
             SELECT id FROM cpus
             ORDER BY embedding <=> CAST(:vec AS vector)
             LIMIT 1
         """),
         {"vec": str(cpu_embedding)},
-    ).scalar()
+    )
+    cpu = cpu_result.scalar()
 
     if not cpu:
         raise HTTPException(
@@ -190,7 +213,7 @@ async def create_account(
         )
 
     try:
-        hashed_password = bcrypt_context.hash(user_data.password)
+        hashed_password = await hash_password(user_data.password)
 
         # Gera segredo OTP para 2FA
         otp_secret = pyotp.random_base32()
@@ -211,7 +234,7 @@ async def create_account(
         )
 
         # Envia email de verificação
-        email_sent = send_email_signup(user_data.email, otp_code)
+        email_sent = await _run_blocking(send_email_signup, user_data.email, otp_code)
         if not email_sent:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -219,8 +242,8 @@ async def create_account(
             )
 
         session.add(new_user)
-        session.commit()
-        session.refresh(new_user)
+        await session.commit()
+        await session.refresh(new_user)
 
         return {
             "status": "success",
@@ -231,7 +254,7 @@ async def create_account(
     except HTTPException:
         raise
     except Exception as e:
-        session.rollback()
+        await session.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Erro ao criar conta: {str(e)}",
@@ -244,7 +267,7 @@ async def verify_signup_code(
     request: Request,
     code_data: CodeSchema,
     response: Response,
-    session: Session = Depends(get_session),
+    session: AsyncSession = Depends(get_session),
 ):
     """
     Verifica código OTP de ativação de conta.
@@ -252,7 +275,9 @@ async def verify_signup_code(
     - Ativa o usuário se código válido
     - Retorna access_token e refresh_token
     """
-    user = session.query(Users).filter(Users.email == code_data.email).first()
+    stmt = select(Users).where(Users.email == code_data.email)
+    db_result = await session.execute(stmt)
+    user = db_result.scalars().first()
 
     if not user:
         raise HTTPException(
@@ -276,7 +301,7 @@ async def verify_signup_code(
 
     # Ativa usuário
     user.ativo = True
-    session.commit()
+    await session.commit()
 
     # Gera tokens
     access_token = generate_token(user.id)
@@ -295,7 +320,7 @@ async def verify_signup_code(
 async def login(
     request: Request,
     login_data: LoginSchema,
-    session: Session = Depends(get_session),
+    session: AsyncSession = Depends(get_session),
 ):
     """
     Autentica usuário com email/senha e envia OTP por email.
@@ -304,7 +329,7 @@ async def login(
     - Verifica se conta está ativa
     - Envia código OTP 2FA por email
     """
-    user = authenticate_user(login_data.email, login_data.password, session)
+    user = await authenticate_user(login_data.email, login_data.password, session)
 
     if not user:
         raise HTTPException(
@@ -322,7 +347,7 @@ async def login(
     totp = pyotp.TOTP(user.otp_secret, interval=OTP_LOGIN_INTERVAL)
     otp_code = totp.now()
 
-    email_sent = send_email_login(user.email, otp_code)
+    email_sent = await _run_blocking(send_email_login, user.email, otp_code)
     if not email_sent:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -341,7 +366,7 @@ async def verify_login_code(
     request: Request,
     response: Response,
     code_data: CodeSchema,
-    session: Session = Depends(get_session),
+    session: AsyncSession = Depends(get_session),
 ):
     """
     Verifica código OTP de login e retorna tokens JWT.
@@ -349,7 +374,9 @@ async def verify_login_code(
     - Valida código OTP
     - Retorna access_token e refresh_token
     """
-    user = session.query(Users).filter(Users.email == code_data.email).first()
+    stmt = select(Users).where(Users.email == code_data.email)
+    db_result = await session.execute(stmt)
+    user = db_result.scalars().first()
 
     if not user:
         raise HTTPException(
@@ -387,7 +414,7 @@ async def verify_login_code(
 async def refresh_token(
     request: Request,
     response: Response,
-    session: Session = Depends(get_session),
+    session: AsyncSession = Depends(get_session),
 ):
     """
     Renova o access_token usando um refresh_token válido.
@@ -414,7 +441,9 @@ async def refresh_token(
             )
 
         # Verifica se usuário existe e está ativo
-        user = session.query(Users).filter(Users.id == user_id).first()
+        stmt = select(Users).where(Users.id == user_id)
+        db_result = await session.execute(stmt)
+        user = db_result.scalars().first()
         if not user or not user.ativo:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -451,7 +480,7 @@ async def logout(request: Request, response: Response):
 async def get_current_user(
     request: Request,
     user_id: UUID = Depends(get_current_user_id),
-    session: Session = Depends(get_session),
+    session: AsyncSession = Depends(get_session),
 ):
     """
     Retorna dados do usuário autenticado via token JWT no header Authorization.
@@ -460,7 +489,16 @@ async def get_current_user(
     - Retorna dados do usuário (sem senha)
     - Retorna informações de GPU, CPU e RAM através das relações
     """
-    user = session.query(Users).filter(Users.id == user_id).first()
+    # selectinload carrega gpu_rel/cpu_rel na mesma query (eager load).
+    # Sem isso, acessar user.gpu_rel abaixo dispararia lazy load síncrono
+    # e quebraria com AsyncSession (MissingGreenlet).
+    stmt = (
+        select(Users)
+        .where(Users.id == user_id)
+        .options(selectinload(Users.gpu_rel), selectinload(Users.cpu_rel))
+    )
+    db_result = await session.execute(stmt)
+    user = db_result.scalars().first()
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -490,13 +528,15 @@ async def get_current_user(
 )
 @limiter.limit("5/minute")
 async def forgot_password(
-    request: Request, user_schema: UserBase, session: Session = Depends(get_session)
+    request: Request, user_schema: UserBase, session: AsyncSession = Depends(get_session)
 ):
     """
     Consulta o Banco para verificar se o usuário está cadastro, caso esteja, um código será enviado
     para que ele possa confirmar sua identidade e trocar sua senha.
     """
-    user = session.query(Users).filter(Users.email == user_schema.email).first()
+    stmt = select(Users).where(Users.email == user_schema.email)
+    db_result = await session.execute(stmt)
+    user = db_result.scalars().first()
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -505,7 +545,7 @@ async def forgot_password(
 
     totp = pyotp.TOTP(user.otp_secret, interval=OTP_LOGIN_INTERVAL)
     otp_code = totp.now()
-    email_sent = send_email_recovery(user.email, otp_code)
+    email_sent = await _run_blocking(send_email_recovery, user.email, otp_code)
     if not email_sent:
         raise HTTPException(500, "Erro ao enviar email de recuperação")
 
@@ -515,9 +555,11 @@ async def forgot_password(
 @auth_router.post("/verify_recovery_code")
 @limiter.limit("10/minute")
 async def verify_recovery_code(
-    request: Request, code_schema: CodeSchema, session: Session = Depends(get_session)
+    request: Request, code_schema: CodeSchema, session: AsyncSession = Depends(get_session)
 ):
-    user = session.query(Users).filter(Users.email == code_schema.email).first()
+    stmt = select(Users).where(Users.email == code_schema.email)
+    db_result = await session.execute(stmt)
+    user = db_result.scalars().first()
 
     if not user:
         raise HTTPException(
@@ -557,7 +599,7 @@ async def change_password(
     request: Request,
     new_password: PasswordReset,
     response: Response,
-    session=Depends(get_session),
+    session: AsyncSession = Depends(get_session),
 ):
     try:
         payload = jwt.decode(
@@ -569,7 +611,9 @@ async def change_password(
         raise HTTPException(401, "Token inválido para esta operação")
 
     user_id = payload["sub"]
-    user = session.query(Users).filter(Users.id == user_id).first()
+    stmt = select(Users).where(Users.id == user_id)
+    db_result = await session.execute(stmt)
+    user = db_result.scalars().first()
 
     if not user:
         raise HTTPException(
@@ -577,10 +621,10 @@ async def change_password(
             detail="Usuário não encontrado",
         )
 
-    hashed_password = bcrypt_context.hash(new_password.new_password)
+    hashed_password = await hash_password(new_password.new_password)
 
     user.password = hashed_password
-    session.commit()
+    await session.commit()
 
     access_token = generate_token(user.id)
     set_refresh_cookie(response, user.id)
