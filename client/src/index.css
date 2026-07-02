@@ -23,6 +23,7 @@
 html, body, #root {
   width: 100%;
   height: 100%;
+  overflow-x: hidden;
 }
 
 :root {
@@ -353,4 +354,49 @@ button {
   50% {
     opacity: 0.5;
   }
+}
+
+@keyframes fps-pop {
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.94);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.recent-log-carousel {
+  scroll-snap-type: x mandatory;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 219, 233, 0.55) rgba(15, 23, 42, 0.75);
+}
+
+.glass-card.recent-logs-panel {
+  min-height: auto;
+  justify-content: flex-start;
+}
+
+.glass-card.avatar-library-panel {
+  min-height: auto;
+  justify-content: flex-start;
+}
+
+.recent-logs-panel .card-header {
+  margin-bottom: 16px;
+}
+
+.recent-log-carousel::-webkit-scrollbar {
+  height: 8px;
+}
+
+.recent-log-carousel::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.75);
+  border-radius: 999px;
+}
+
+.recent-log-carousel::-webkit-scrollbar-thumb {
+  background: rgba(0, 219, 233, 0.55);
+  border-radius: 999px;
 }

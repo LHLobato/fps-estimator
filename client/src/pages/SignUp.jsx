@@ -107,7 +107,7 @@ export default function SignUp() {
     } else if (step === 'verify_code') {
       setIsLoading(true);
       try {
-        const response = await authAPI.verify_code_sign({
+        await authAPI.verify_code_sign({
           email: formData.email,
           code
         });
