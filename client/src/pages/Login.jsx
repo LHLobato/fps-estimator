@@ -3,6 +3,13 @@ import { useNavigate, Link } from 'react-router-dom';
 import * as authAPI from '../api/auth';
 import { useAuth } from '../hooks/useAuth';
 
+const APP_LOGO_SRC = '/brand/logo.png';
+const AUTH_NAV_ITEMS = [
+  { path: '/', label: 'Estimator', icon: 'speed' },
+  { path: '/compare', label: 'Comparison', icon: 'compare_arrows' },
+  { path: '/user', label: 'Profile', icon: 'fingerprint' },
+];
+
 export default function Login() {
   const navigate = useNavigate();
   const { login, handleVerifyCode } = useAuth();
@@ -157,40 +164,36 @@ export default function Login() {
   };
 
   return (
-    <div className="flex h-screen bg-slate-950">
-      {/* SIDEBAR DESATIVADA (Apenas visual) */}
-      <aside className="fixed left-0 top-0 h-full w-64 border-r border-cyan-500/30 bg-slate-950/40 backdrop-blur-xl shadow-[20px_0_40px_-15px_rgba(0,0,0,0.5)] z-50 flex flex-col opacity-40 pointer-events-none">
-        <div className="px-2 pt-2 mx-2">
-          <h1 className="text-2xl font-black tracking-tighter text-cyan-400 drop-shadow-[0_0_8px_rgba(0,240,255,0.5)] font-['Space_Grotesk'] tracking-wider uppercase">
-            FPS_CORE
-          </h1>
-          <p className="text-[10px] text-slate-500 font-label-caps mt-1 tracking-widest">V.0.1_STABLE</p>
-        </div>
-        <nav className="flex-1 mt-6 flex flex-col gap-1">
-          <div className="flex items-center gap-3 px-5 h-12 rounded-sm text-slate-400">
-            <span className="material-symbols-outlined text-lg">speed</span>
-            <span className="font-label-caps text-xs">Estimator</span>
-          </div>
-          <div className="flex items-center gap-3 px-5 h-12 rounded-sm text-slate-400">
-            <span className="material-symbols-outlined text-lg">compare_arrows</span>
-            <span className="font-label-caps text-xs">Comparison</span>
-          </div>
-          <div className="flex items-center gap-3 px-5 h-12 rounded-sm text-slate-400">
-            <span className="material-symbols-outlined text-lg">fingerprint</span>
-            <span className="font-label-caps text-xs">Profile</span>
-          </div>
+    <div className="min-h-screen overflow-x-hidden bg-slate-950 lg:pl-20">
+      <aside className="fixed left-0 top-0 z-50 hidden h-full w-20 flex-col border-r border-cyan-500/25 bg-slate-950/70 px-3 py-4 shadow-[20px_0_40px_-22px_rgba(0,0,0,0.75)] backdrop-blur-xl lg:flex">
+        <Link
+          to="/"
+          title="FPS Estimator"
+          aria-label="FPS Estimator home"
+          className="mb-8 flex h-12 w-12 items-center justify-center overflow-hidden rounded border border-cyan-500/40 bg-slate-950 p-2 text-cyan-300 shadow-[0_0_18px_rgba(0,219,233,0.12)]"
+        >
+          <img src={APP_LOGO_SRC} alt="" className="h-full w-full object-contain" />
+        </Link>
+
+        <nav className="flex flex-1 flex-col items-center gap-2">
+          {AUTH_NAV_ITEMS.map((item) => (
+            <Link
+              key={item.path}
+              to={item.path}
+              title={item.label}
+              aria-label={item.label}
+              className="flex h-12 w-12 items-center justify-center rounded text-slate-400 transition-all duration-300 hover:bg-white/5 hover:text-cyan-200"
+            >
+              <span className="material-symbols-outlined text-[22px]">{item.icon}</span>
+            </Link>
+          ))}
         </nav>
-        <div className="pb-1 mx-1">
-          <button className="w-full py-3 bg-cyan-500/10 border border-cyan-500/40 text-cyan-400 font-label-caps text-[10px] tracking-[0.2em]">
-            OPTIMIZE SYSTEM
-          </button>
-        </div>
       </aside>
 
       {/* MAIN CONTENT */}
-      <div className="flex-1 flex flex-col ml-64">
+      <div className="flex min-h-screen flex-col">
         {/* TOP APP BAR */}
-        <header className="fixed top-0 right-0 left-64 h-16 flex justify-between items-center px-2 bg-slate-950/60 backdrop-blur-md border-b border-cyan-500/20 shadow-2xl shadow-cyan-900/20 z-40">
+        <header className="fixed left-0 right-0 top-0 z-40 flex h-16 items-center justify-between px-4 bg-slate-950/60 backdrop-blur-md border-b border-cyan-500/20 shadow-2xl shadow-cyan-900/20 lg:left-20 md:px-6">
           <div className="flex items-center mx-2">
             <span className="text-lg font-bold text-white tracking-widest font-['Space_Grotesk']">FRAME_ANALYSIS_CMD</span>
             <div className="h-4 w-[1px] bg-white/20 mx-2"></div>
@@ -214,7 +217,7 @@ export default function Login() {
         </header>
 
         {/* PAGE CONTENT */}
-        <main className="fixed inset-0 top-16 overflow-y-auto relative z-10 flex items-center justify-center">
+        <main className="fixed inset-0 top-16 z-10 flex items-center justify-center overflow-y-auto lg:left-20">
           <div className="fixed inset-0 z-0 pointer-events-none">
             <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-cyan-900/20 blur-[120px] rounded-full"></div>
             <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-900/10 blur-[120px] rounded-full"></div>
@@ -227,7 +230,9 @@ export default function Login() {
                 <div className="inline-block px-3 py-1 mb-4 border border-cyan-500/30 bg-cyan-500/5 rounded text-[10px] font-label-caps text-cyan-400 uppercase tracking-[0.3em] transition-all">
                   {getStepTitle()}
                 </div>
-                <h1 className="font-headline-lg text-primary-fixed mb-2 uppercase tracking-tighter">FPS_CORE</h1>
+                <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center overflow-hidden rounded border border-cyan-500/40 bg-slate-950 p-3 shadow-[0_0_24px_rgba(0,219,233,0.14)]">
+                  <img src={APP_LOGO_SRC} alt="FPS Estimator" className="h-full w-full object-contain" />
+                </div>
                 <p className="text-on-surface-variant text-sm font-body-md opacity-70 min-h-[40px]">
                   {getStepDescription()}
                 </p>

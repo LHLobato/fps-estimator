@@ -10,6 +10,8 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import { useAuth } from './hooks/useAuth';
 import './App.css';
 
+const APP_LOGO_SRC = '/brand/logo.png';
+
 function AppLayout() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -37,8 +39,13 @@ function AppLayout() {
   return (
     <div className="min-h-screen overflow-x-hidden bg-slate-950 lg:pl-20">
       <aside className="fixed left-0 top-0 z-50 hidden h-full w-20 flex-col border-r border-cyan-500/25 bg-slate-950/70 px-3 py-4 shadow-[20px_0_40px_-22px_rgba(0,0,0,0.75)] backdrop-blur-xl lg:flex">
-        <Link to="/" className="mb-8 flex h-12 w-12 items-center justify-center rounded border border-cyan-500/40 bg-cyan-500/10 text-cyan-300">
-          <span className="material-symbols-outlined text-[26px]">speed</span>
+        <Link
+          to="/"
+          title="FPS Estimator"
+          aria-label="FPS Estimator home"
+          className="mb-8 flex h-12 w-12 items-center justify-center overflow-hidden rounded border border-cyan-500/40 bg-slate-950 p-2 text-cyan-300 shadow-[0_0_18px_rgba(0,219,233,0.12)]"
+        >
+          <img src={APP_LOGO_SRC} alt="" className="h-full w-full object-contain" />
         </Link>
 
         <nav className="flex flex-1 flex-col items-center gap-2">
@@ -61,23 +68,19 @@ function AppLayout() {
             );
           })}
         </nav>
-
-        <button
-          title="Optimize system"
-          aria-label="Optimize system"
-          className="flex h-12 w-12 items-center justify-center rounded border border-cyan-500/35 bg-cyan-500/10 text-cyan-300 hover:bg-cyan-500 hover:text-slate-950"
-        >
-          <span className="material-symbols-outlined text-[22px]">bolt</span>
-        </button>
       </aside>
 
       {drawerOpen && (
         <div className="fixed inset-0 z-[70] bg-slate-950/70 backdrop-blur-sm lg:hidden" onClick={closeDrawer}>
           <aside className="h-full w-[min(82vw,320px)] border-r border-cyan-500/30 bg-slate-950 p-5 shadow-2xl" onClick={(event) => event.stopPropagation()}>
             <div className="mb-8 flex items-center justify-between">
-              <div>
-                <h1 className="font-['Space_Grotesk'] text-2xl font-black uppercase tracking-widest text-cyan-400 drop-shadow-[0_0_8px_rgba(0,240,255,0.5)]">FPS_CORE</h1>
-                <p className="mt-1 font-label-caps text-[10px] tracking-widest text-slate-500">V.0.1_STABLE</p>
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded border border-cyan-500/40 bg-slate-950 p-2 shadow-[0_0_18px_rgba(0,219,233,0.12)]">
+                  <img src={APP_LOGO_SRC} alt="" className="h-full w-full object-contain" />
+                </div>
+                <div className="min-w-0">
+                  <p className="mt-1 font-label-caps text-[10px] tracking-widest text-slate-500">V.0.1_STABLE</p>
+                </div>
               </div>
               <button onClick={closeDrawer} className="flex h-10 w-10 items-center justify-center rounded bg-white/5 text-slate-300">
                 <span className="material-symbols-outlined">close</span>

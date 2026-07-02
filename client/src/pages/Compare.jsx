@@ -43,7 +43,8 @@ export default function Compare() {
   const [compareGameSearch, setCompareGameSearch] = useState('');
   const [selectedPreset, setSelectedPreset] = useState('HIGH');
   const [selectedResolution, setSelectedResolution] = useState('1440P');
-  const [selectedUpscaling, setSelectedUpscaling] = useState('No');
+  const [setup1Upscaling, setSetup1Upscaling] = useState('No');
+  const [setup2Upscaling, setSetup2Upscaling] = useState('No');
   const [result1, setResult1] = useState(null);
   const [result2, setResult2] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -102,6 +103,7 @@ export default function Compare() {
       cpu: setup1CPU,
       gpu: setup1GPU,
       ram: setup1RAM,
+      upscaling: setup1Upscaling,
       result: result1,
     },
     {
@@ -110,6 +112,7 @@ export default function Compare() {
       cpu: setup2CPU,
       gpu: setup2GPU,
       ram: setup2RAM,
+      upscaling: setup2Upscaling,
       result: result2,
     },
   ];
@@ -132,7 +135,7 @@ export default function Compare() {
         gamename: compareGame,
         preset: selectedPreset,
         resolution: selectedResolution,
-        upscaling: selectedUpscaling,
+        upscaling: setup1Upscaling,
         gpu: setup1GPU,
         cpu: setup1CPU,
         ram: setup1RAM,
@@ -142,7 +145,7 @@ export default function Compare() {
         gamename: compareGame,
         preset: selectedPreset,
         resolution: selectedResolution,
-        upscaling: selectedUpscaling,
+        upscaling: setup2Upscaling,
         gpu: setup2GPU,
         cpu: setup2CPU,
         ram: setup2RAM,
@@ -212,6 +215,8 @@ export default function Compare() {
     onGpuSelect,
     onRamSelect,
     filteredRams,
+    upscaling,
+    onUpscalingChange,
   }) => {
     const labelColor = accent === 'cyan' ? 'text-cyan-500' : 'text-secondary';
     const borderColor = accent === 'cyan' ? 'border-cyan-500/30' : 'border-secondary/30';
@@ -254,6 +259,26 @@ export default function Compare() {
             selected: ram,
             onSelect: onRamSelect,
           })}
+
+          <div>
+            <label className={`mb-3 block font-label-caps text-[12px] ${labelColor}`}>UPSCALING_METHOD</label>
+            <div className="grid grid-cols-2 gap-2">
+              {upscalingOptions.map((method) => (
+                <button
+                  key={method}
+                  type="button"
+                  onClick={() => onUpscalingChange(method)}
+                  className={`px-3 py-2 text-xs font-label-caps transition-all ${
+                    upscaling === method
+                      ? `${accent === 'cyan' ? 'border-cyan-500 bg-cyan-500/20 text-cyan-400' : 'border-slate-300 bg-slate-300/15 text-slate-100'} border`
+                      : 'border border-white/10 bg-slate-900 text-slate-400 hover:border-cyan-500 hover:text-cyan-400'
+                  }`}
+                >
+                  {method}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       </section>
     );
@@ -382,7 +407,7 @@ export default function Compare() {
           <div className="rounded border border-cyan-400/20 bg-cyan-500/5 p-3">
             <p className="font-label-caps text-[10px] text-cyan-300">TEST_PROFILE</p>
             <p className="mt-2 text-xs leading-relaxed text-slate-400">
-              {compareGame} at {selectedResolution} / {selectedPreset} / {selectedUpscaling} upscale. Both setups were sent to the same prediction endpoint with identical visual settings.
+              {compareGame} at {selectedResolution} / {selectedPreset}. Setup 01 used {setup1Upscaling} upscale and Setup 02 used {setup2Upscaling} upscale.
             </p>
           </div>
         </div>
@@ -413,7 +438,7 @@ export default function Compare() {
           </span>
         </h2>
         <p className="mt-2 max-w-2xl text-base text-slate-400 sm:text-lg">
-          Compare two builds under the same game, preset, resolution and upscaling mode with clear FPS deltas.
+          Compare two builds under the same game, preset and resolution, with independent upscaling per setup.
         </p>
       </div>
 
@@ -464,26 +489,6 @@ export default function Compare() {
                     ))}
                   </div>
                 </div>
-
-                <div>
-                  <label className="mb-4 block font-label-caps text-[12px] text-cyan-500">UPSCALING_METHOD</label>
-                  <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
-                    {upscalingOptions.map((method) => (
-                      <button
-                        key={method}
-                        type="button"
-                        onClick={() => setSelectedUpscaling(method)}
-                        className={`px-3 py-2 text-xs font-label-caps transition-all ${
-                          selectedUpscaling === method
-                            ? 'border border-cyan-500 bg-cyan-500/20 text-cyan-400'
-                            : 'border border-white/10 bg-slate-900 text-slate-400 hover:border-cyan-500 hover:text-cyan-400'
-                        }`}
-                      >
-                        {method}
-                      </button>
-                    ))}
-                  </div>
-                </div>
               </div>
             </div>
           </GlassCard>
@@ -511,6 +516,8 @@ export default function Compare() {
                 onGpuSelect: (name) => { setSetup1GPU(name); setSetup1GPUSearch(''); },
                 onRamSelect: (ram) => { setSetup1RAM(ram); setSetup1RAMSearch(''); },
                 filteredRams: filteredSetup1RAMs,
+                upscaling: setup1Upscaling,
+                onUpscalingChange: setSetup1Upscaling,
               })}
 
               {renderSetupForm({
@@ -533,6 +540,8 @@ export default function Compare() {
                 onGpuSelect: (name) => { setSetup2GPU(name); setSetup2GPUSearch(''); },
                 onRamSelect: (ram) => { setSetup2RAM(ram); setSetup2RAMSearch(''); },
                 filteredRams: filteredSetup2RAMs,
+                upscaling: setup2Upscaling,
+                onUpscalingChange: setSetup2Upscaling,
               })}
             </div>
 
@@ -608,7 +617,8 @@ export default function Compare() {
                   <p className="text-xs leading-relaxed text-slate-400">
                     <span className={isCyan ? 'text-cyan-400' : 'text-secondary'}>CPU:</span> {setup.cpu}<br />
                     <span className={isCyan ? 'text-cyan-400' : 'text-secondary'}>GPU:</span> {setup.gpu}<br />
-                    <span className={isCyan ? 'text-cyan-400' : 'text-secondary'}>RAM:</span> {setup.ram}
+                    <span className={isCyan ? 'text-cyan-400' : 'text-secondary'}>RAM:</span> {setup.ram}<br />
+                    <span className={isCyan ? 'text-cyan-400' : 'text-secondary'}>UPSCALING:</span> {setup.upscaling}
                   </p>
                 </div>
               </GlassCard>
