@@ -43,6 +43,7 @@ export default function Compare() {
   const [compareGameSearch, setCompareGameSearch] = useState('');
   const [selectedPreset, setSelectedPreset] = useState('HIGH');
   const [selectedResolution, setSelectedResolution] = useState('1440P');
+  const [selectedUpscaling, setSelectedUpscaling] = useState('No');
   const [result1, setResult1] = useState(null);
   const [result2, setResult2] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -75,6 +76,7 @@ export default function Compare() {
 
   const presets = ['ULTRA', 'HIGH', 'MEDIUM', 'LOW'];
   const resolutions = ['1080P', '1440P', '4K_UHD'];
+  const upscalingOptions = ['No', 'DLSS', 'FSR', 'XeSS'];
 
   const hasResults = Boolean(result1 && result2);
   const metrics = hasResults
@@ -130,7 +132,7 @@ export default function Compare() {
         gamename: compareGame,
         preset: selectedPreset,
         resolution: selectedResolution,
-        upscaling: 'DLSS',
+        upscaling: selectedUpscaling,
         gpu: setup1GPU,
         cpu: setup1CPU,
         ram: setup1RAM,
@@ -140,7 +142,7 @@ export default function Compare() {
         gamename: compareGame,
         preset: selectedPreset,
         resolution: selectedResolution,
-        upscaling: 'DLSS',
+        upscaling: selectedUpscaling,
         gpu: setup2GPU,
         cpu: setup2CPU,
         ram: setup2RAM,
@@ -380,7 +382,7 @@ export default function Compare() {
           <div className="rounded border border-cyan-400/20 bg-cyan-500/5 p-3">
             <p className="font-label-caps text-[10px] text-cyan-300">TEST_PROFILE</p>
             <p className="mt-2 text-xs leading-relaxed text-slate-400">
-              {compareGame} at {selectedResolution} / {selectedPreset}. Both setups were sent to the same prediction endpoint with identical visual settings.
+              {compareGame} at {selectedResolution} / {selectedPreset} / {selectedUpscaling} upscale. Both setups were sent to the same prediction endpoint with identical visual settings.
             </p>
           </div>
         </div>
@@ -411,7 +413,7 @@ export default function Compare() {
           </span>
         </h2>
         <p className="mt-2 max-w-2xl text-base text-slate-400 sm:text-lg">
-          Compare two builds under the same game, preset and resolution with clear FPS deltas.
+          Compare two builds under the same game, preset, resolution and upscaling mode with clear FPS deltas.
         </p>
       </div>
 
@@ -458,6 +460,26 @@ export default function Compare() {
                         }`}
                       >
                         {resolution}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="mb-4 block font-label-caps text-[12px] text-cyan-500">UPSCALING_METHOD</label>
+                  <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+                    {upscalingOptions.map((method) => (
+                      <button
+                        key={method}
+                        type="button"
+                        onClick={() => setSelectedUpscaling(method)}
+                        className={`px-3 py-2 text-xs font-label-caps transition-all ${
+                          selectedUpscaling === method
+                            ? 'border border-cyan-500 bg-cyan-500/20 text-cyan-400'
+                            : 'border border-white/10 bg-slate-900 text-slate-400 hover:border-cyan-500 hover:text-cyan-400'
+                        }`}
+                      >
+                        {method}
                       </button>
                     ))}
                   </div>

@@ -22,6 +22,7 @@ export default function Estimate() {
   const [selectedGameImage, setSelectedGameImage] = useState(null);
   const [selectedPreset, setSelectedPreset] = useState('HIGH');
   const [selectedResolution, setSelectedResolution] = useState('1440P');
+  const [selectedUpscaling, setSelectedUpscaling] = useState('No');
   const [selectedGPU, setSelectedGPU] = useState('');
   const [selectedCPU, setSelectedCPU] = useState('');
   const [selectedRAM, setSelectedRAM] = useState('');
@@ -54,7 +55,7 @@ export default function Estimate() {
           const formattedRecent = response.items.map((item, index) => ({
             id: `${item.game_id}-${Date.now()}-${index}`,
             name: item.game_name,
-            specs: `${item.resolution} • ${item.preset}`,
+            specs: `${item.resolution} • ${item.preset} • ${item.upscaling || 'No'} upscale`,
             fps: item.avg_fps,
             resolution: item.resolution,
             image: getValidImageUrl(item.image_url || item.game_image || item.cover_url),
@@ -103,7 +104,7 @@ export default function Estimate() {
         gamename: selectedGame,
         preset: selectedPreset,
         resolution: selectedResolution,
-        upscaling: 'DLSS',
+        upscaling: selectedUpscaling,
         gpu: selectedGPU,
         cpu: selectedCPU,
         ram: selectedRAM,
@@ -117,7 +118,7 @@ export default function Estimate() {
           game_id: selectedGameId, 
           preset: selectedPreset,
           resolution: selectedResolution,
-          upscaling: 'DLSS',
+          upscaling: selectedUpscaling,
           avg_fps: Math.round(data.avg_fps), 
           min_fps: Math.round(data.min_fps),
           max_fps: Math.round(data.max_fps)
@@ -130,7 +131,7 @@ export default function Estimate() {
         const newEstimate = {
           id: Date.now(),
           name: selectedGame,
-          specs: `${selectedResolution} • ${selectedGPU.split(' ').pop()} • ${selectedPreset}`,
+          specs: `${selectedResolution} • ${selectedGPU.split(' ').pop()} • ${selectedPreset} • ${selectedUpscaling} upscale`,
           fps: Math.round(data.avg_fps) || 0,
           resolution: selectedResolution,
           image: selectedGameImage,
@@ -148,6 +149,7 @@ export default function Estimate() {
 
   const presets = ['ULTRA', 'HIGH', 'MEDIUM', 'LOW'];
   const resolutions = ['1080P', '1440P', '4K_UHD'];
+  const upscalingOptions = ['No', 'DLSS', 'FSR', 'XeSS'];
 
   const renderStepShell = ({ id, title, icon, children }) => {
     const stepNumber = ['game', 'visuals', 'hardware', 'result'].indexOf(id) + 1;
@@ -254,7 +256,7 @@ export default function Estimate() {
   );
 
   const renderVisualSelector = () => (
-    <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
+    <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
       <div>
         <label className="block font-label-caps text-[12px] text-cyan-500 mb-4">
           GRAPHICS_PRESET
@@ -294,6 +296,28 @@ export default function Estimate() {
               }`}
             >
               {res}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <label className="block font-label-caps text-[12px] text-cyan-500 mb-4">
+          UPSCALING_METHOD
+        </label>
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+          {upscalingOptions.map((method) => (
+            <button
+              key={method}
+              type="button"
+              onClick={() => setSelectedUpscaling(method)}
+              className={`px-3 py-2 text-xs font-label-caps transition-all ${
+                selectedUpscaling === method
+                  ? 'bg-cyan-500/20 border border-cyan-500 text-cyan-400'
+                  : 'bg-slate-900 border border-white/10 text-slate-400 hover:border-cyan-500 hover:text-cyan-400'
+              }`}
+            >
+              {method}
             </button>
           ))}
         </div>
@@ -435,7 +459,7 @@ export default function Estimate() {
             <div className="rounded border border-cyan-400/20 bg-cyan-500/5 p-3">
               <p className="font-label-caps text-[10px] text-cyan-300">PROFILE_USED</p>
               <p className="mt-2 text-xs leading-relaxed text-slate-400">
-                {selectedGame} at {selectedResolution} / {selectedPreset} with {selectedGPU || 'selected GPU'}, {selectedCPU || 'selected CPU'} and {selectedRAM || 'selected RAM'}.
+                {selectedGame} at {selectedResolution} / {selectedPreset} / {selectedUpscaling} upscale with {selectedGPU || 'selected GPU'}, {selectedCPU || 'selected CPU'} and {selectedRAM || 'selected RAM'}.
               </p>
             </div>
           </div>

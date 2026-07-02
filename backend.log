@@ -2,40 +2,24 @@ api-1  | INFO:     Started server process [1]
 api-1  | INFO:     Waiting for application startup.
 api-1  | INFO:     Application startup complete.
 api-1  | INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
-api-1  | INFO:     172.19.0.1:33014 - "GET /health HTTP/1.1" 200 OK
-api-1  | INFO:     172.19.0.1:33024 - "POST /auth/refresh_token HTTP/1.1" 200 OK
-api-1  | INFO:     172.19.0.1:33024 - "GET /auth/me HTTP/1.1" 200 OK
-api-1  | INFO:     172.19.0.1:43614 - "GET /games/recent HTTP/1.1" 200 OK
-api-1  | INFO:     172.19.0.1:33024 - "GET /auth/me HTTP/1.1" 200 OK
-api-1  | INFO:     172.19.0.1:43614 - "GET /games/recent HTTP/1.1" 200 OK
-api-1  | INFO:     172.19.0.1:33024 - "GET /auth/me HTTP/1.1" 200 OK
-api-1  | INFO:     172.19.0.1:33024 - "GET /auth/me HTTP/1.1" 200 OK
-api-1  | INFO:     172.19.0.1:33024 - "GET /auth/me HTTP/1.1" 200 OK
-api-1  | INFO:     172.19.0.1:33024 - "GET /auth/me HTTP/1.1" 200 OK
-api-1  | INFO:     172.19.0.1:33024 - "GET /auth/me HTTP/1.1" 200 OK
-api-1  | INFO:     172.19.0.1:43634 - "GET /games/user_list HTTP/1.1" 200 OK
-api-1  | INFO:     172.19.0.1:33024 - "GET /auth/me HTTP/1.1" 200 OK
-api-1  | INFO:     172.19.0.1:43634 - "GET /games/user_list HTTP/1.1" 200 OK
-api-1  | INFO:     172.19.0.1:43622 - "GET /games/all-info HTTP/1.1" 200 OK
-api-1  | INFO:     172.19.0.1:36354 - "GET /games/all-info HTTP/1.1" 200 OK
-api-1  | INFO:     172.19.0.1:55438 - "GET /games/user_list HTTP/1.1" 200 OK
-api-1  | INFO:     172.19.0.1:55438 - "GET /games/user_list HTTP/1.1" 200 OK
-api-1  | INFO:     172.19.0.1:35998 - "GET /auth/me HTTP/1.1" 200 OK
-api-1  | INFO:     172.19.0.1:36000 - "GET /games/user_list HTTP/1.1" 200 OK
-api-1  | INFO:     172.19.0.1:36000 - "GET /games/user_list HTTP/1.1" 200 OK
-api-1  | INFO:     172.19.0.1:35998 - "GET /auth/me HTTP/1.1" 200 OK
-api-1  | INFO:     172.19.0.1:35998 - "GET /auth/me HTTP/1.1" 200 OK
-api-1  | INFO:     172.19.0.1:36000 - "GET /games/recent HTTP/1.1" 200 OK
-api-1  | INFO:     172.19.0.1:36000 - "GET /games/recent HTTP/1.1" 200 OK
-api-1  | INFO:     172.19.0.1:35998 - "GET /auth/me HTTP/1.1" 200 OK
-api-1  | INFO:     172.19.0.1:36000 - "GET /games/user_list HTTP/1.1" 200 OK
-api-1  | INFO:     172.19.0.1:36000 - "GET /games/user_list HTTP/1.1" 429 Too Many Requests
-api-1  | INFO:     172.19.0.1:35998 - "GET /auth/me HTTP/1.1" 200 OK
-api-1  | INFO:     172.19.0.1:35998 - "GET /auth/me HTTP/1.1" 200 OK
-api-1  | INFO:     172.19.0.1:36916 - "POST /auth/refresh_token HTTP/1.1" 200 OK
-api-1  | INFO:     172.19.0.1:36916 - "GET /auth/me HTTP/1.1" 200 OK
-api-1  | INFO:     172.19.0.1:36926 - "GET /games/user_list HTTP/1.1" 200 OK
-api-1  | INFO:     172.19.0.1:36926 - "GET /games/user_list HTTP/1.1" 200 OK
-api-1  | INFO:     172.19.0.1:36916 - "GET /auth/me HTTP/1.1" 200 OK
-api-1  | INFO:     172.19.0.1:37850 - "GET /games/user_list HTTP/1.1" 200 OK
+api-1  | INFO:     172.19.0.1:40636 - "GET /health HTTP/1.1" 200 OK
+api-1  | INFO:     172.19.0.1:40652 - "POST /auth/refresh_token HTTP/1.1" 200 OK
+api-1  | INFO:     172.19.0.1:40654 - "OPTIONS /auth/me HTTP/1.1" 200 OK
+api-1  | INFO:     172.19.0.1:40670 - "OPTIONS /auth/me HTTP/1.1" 200 OK
+api-1  | INFO:     172.19.0.1:40652 - "GET /auth/me HTTP/1.1" 200 OK
+api-1  | INFO:     172.19.0.1:40670 - "OPTIONS /games/user_list HTTP/1.1" 200 OK
+api-1  | INFO:     172.19.0.1:40654 - "OPTIONS /games/user_list HTTP/1.1" 200 OK
+api-1  | INFO:     172.19.0.1:43206 - "GET /games/user_list HTTP/1.1" 200 OK
+api-1  | INFO:     172.19.0.1:40652 - "GET /auth/me HTTP/1.1" 200 OK
+api-1  | INFO:     172.19.0.1:43206 - "GET /games/user_list HTTP/1.1" 200 OK
+api-1  | INFO:     172.19.0.1:40654 - "OPTIONS /games/recent HTTP/1.1" 200 OK
+api-1  | INFO:     172.19.0.1:40670 - "OPTIONS /games/recent HTTP/1.1" 200 OK
+api-1  | INFO:     172.19.0.1:40652 - "GET /games/recent HTTP/1.1" 200 OK
+api-1  | INFO:     172.19.0.1:40652 - "GET /games/recent HTTP/1.1" 200 OK
+api-1  | INFO:     172.19.0.1:43206 - "GET /auth/me HTTP/1.1" 200 OK
+api-1  | INFO:     172.19.0.1:43206 - "GET /auth/me HTTP/1.1" 200 OK
+api-1  | INFO:     172.19.0.1:34846 - "GET /auth/me HTTP/1.1" 200 OK
+api-1  | INFO:     172.19.0.1:34846 - "GET /auth/me HTTP/1.1" 200 OK
+api-1  | INFO:     172.19.0.1:55228 - "GET /games/user_list HTTP/1.1" 200 OK
+api-1  | INFO:     172.19.0.1:55228 - "GET /games/user_list HTTP/1.1" 200 OK
 

@@ -313,7 +313,9 @@ export default function User() {
             {game.resolution}
           </span>
           <h4 className="truncate text-base font-semibold text-white">{game.game_name}</h4>
-          <p className="mt-1 truncate text-xs text-slate-400">{game.preset} preset</p>
+          <p className="mt-1 truncate text-xs text-slate-400">
+            {game.preset} preset • {game.upscaling || 'No'} upscale
+          </p>
         </div>
         <div className="text-right">
           <span className="block text-4xl font-data-display leading-none text-cyan-400">{Math.round(game.avg_fps)}</span>
