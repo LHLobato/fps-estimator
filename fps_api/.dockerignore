@@ -1,2 +1,45 @@
+# Segredos (já tinha)
 .env
 .env.*
+
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+venv/
+.venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+
+# Node / frontend
+client/node_modules/
+client/dist/
+client/.vite/
+
+# Logs e scripts locais (do start.sh)
+*.log
+backend.log
+client/frontend.log
+
+# Docker
+docker-compose.yml
+docker-compose.override.yml
+Dockerfile
+fps_api/Dockerfile
+
+# IDE / SO
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Docs (não precisa ir pra imagem)
+README.md
+*.md

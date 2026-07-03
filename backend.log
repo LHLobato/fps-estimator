@@ -3,61 +3,20 @@ Attaching to fps-estimator_api_1
 [36mapi_1  |[0m INFO:     Waiting for application startup.
 [36mapi_1  |[0m INFO:     Application startup complete.
 [36mapi_1  |[0m INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
-[36mapi_1  |[0m INFO:     172.19.0.1:44662 - "GET /health HTTP/1.1" 200 OK
-[36mapi_1  |[0m INFO:     172.19.0.1:58398 - "POST /auth/refresh_token HTTP/1.1" 200 OK
-[36mapi_1  |[0m INFO:     172.19.0.1:58408 - "OPTIONS /auth/me HTTP/1.1" 200 OK
-[36mapi_1  |[0m INFO:     172.19.0.1:58422 - "OPTIONS /auth/me HTTP/1.1" 200 OK
-[36mapi_1  |[0m INFO:     172.19.0.1:58436 - "GET /auth/me HTTP/1.1" 200 OK
-[36mapi_1  |[0m INFO:     172.19.0.1:58408 - "OPTIONS /games/recent HTTP/1.1" 200 OK
-[36mapi_1  |[0m INFO:     172.19.0.1:58422 - "OPTIONS /games/recent HTTP/1.1" 200 OK
-[36mapi_1  |[0m INFO:     172.19.0.1:58398 - "GET /auth/me HTTP/1.1" 200 OK
-[36mapi_1  |[0m INFO:     172.19.0.1:58464 - "GET /games/recent HTTP/1.1" 200 OK
-[36mapi_1  |[0m INFO:     172.19.0.1:58458 - "GET /games/recent HTTP/1.1" 200 OK
-[36mapi_1  |[0m INFO:     172.19.0.1:58436 - "GET /auth/me HTTP/1.1" 200 OK
-[36mapi_1  |[0m INFO:     172.19.0.1:58448 - "GET /auth/me HTTP/1.1" 200 OK
-[36mapi_1  |[0m INFO:     172.19.0.1:52558 - "OPTIONS /hardware/games/search?q=cyberpunk&limit=10 HTTP/1.1" 200 OK
-[36mapi_1  |[0m INFO:     172.19.0.1:58448 - "GET /hardware/games/search?q=cyberpunk&limit=10 HTTP/1.1" 200 OK
-[36mapi_1  |[0m INFO:     172.19.0.1:52558 - "OPTIONS /hardware/games/search?q=cy&limit=10 HTTP/1.1" 200 OK
-[36mapi_1  |[0m INFO:     172.19.0.1:49504 - "GET /hardware/games/search?q=cyberpunk&limit=10 HTTP/1.1" 200 OK
-[36mapi_1  |[0m INFO:     172.19.0.1:58448 - "GET /hardware/games/search?q=cy&limit=10 HTTP/1.1" 200 OK
-[36mapi_1  |[0m INFO:     172.19.0.1:49516 - "OPTIONS /estimate/ask_llm HTTP/1.1" 200 OK
-[36mapi_1  |[0m Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
-[36mapi_1  |[0m Loading weights:   0%|          | 0/103 [00:00<?, ?it/s]Loading weights: 100%|██████████| 103/103 [00:00<00:00, 2084.04it/s]
-[36mapi_1  |[0m INFO:     172.19.0.1:58448 - "POST /estimate/ask_llm HTTP/1.1" 200 OK
-[36mapi_1  |[0m INFO:     172.19.0.1:58448 - "POST /games/include HTTP/1.1" 200 OK
-[36mapi_1  |[0m INFO:     172.19.0.1:44326 - "OPTIONS /games/all-info HTTP/1.1" 200 OK
-[36mapi_1  |[0m INFO:     172.19.0.1:44342 - "OPTIONS /games/user_list HTTP/1.1" 200 OK
-[36mapi_1  |[0m INFO:     172.19.0.1:44346 - "OPTIONS /games/all-info HTTP/1.1" 200 OK
-[36mapi_1  |[0m INFO:     172.19.0.1:44356 - "OPTIONS /games/user_list HTTP/1.1" 200 OK
-[36mapi_1  |[0m INFO:     172.19.0.1:44398 - "GET /games/user_list HTTP/1.1" 200 OK
-[36mapi_1  |[0m INFO:     172.19.0.1:44314 - "GET /auth/me HTTP/1.1" 200 OK
-[36mapi_1  |[0m INFO:     172.19.0.1:44376 - "GET /games/user_list HTTP/1.1" 200 OK
-[36mapi_1  |[0m INFO:     172.19.0.1:44320 - "GET /auth/me HTTP/1.1" 200 OK
-[36mapi_1  |[0m INFO:     172.19.0.1:44372 - "GET /games/all-info HTTP/1.1" 200 OK
-[36mapi_1  |[0m INFO:     172.19.0.1:44382 - "GET /games/all-info HTTP/1.1" 200 OK
-[36mapi_1  |[0m INFO:     172.19.0.1:50756 - "GET /games/recent HTTP/1.1" 200 OK
-[36mapi_1  |[0m INFO:     172.19.0.1:50740 - "GET /games/recent HTTP/1.1" 200 OK
-[36mapi_1  |[0m INFO:     172.19.0.1:50760 - "GET /auth/me HTTP/1.1" 200 OK
-[36mapi_1  |[0m INFO:     172.19.0.1:50748 - "GET /auth/me HTTP/1.1" 200 OK
-[36mapi_1  |[0m INFO:     172.19.0.1:40628 - "GET /auth/me HTTP/1.1" 429 Too Many Requests
-[36mapi_1  |[0m INFO:     172.19.0.1:40636 - "GET /games/user_list HTTP/1.1" 200 OK
-[36mapi_1  |[0m INFO:     172.19.0.1:50748 - "GET /auth/me HTTP/1.1" 200 OK
-[36mapi_1  |[0m INFO:     172.19.0.1:40636 - "GET /games/user_list HTTP/1.1" 200 OK
-[36mapi_1  |[0m INFO:     172.19.0.1:40634 - "GET /games/all-info HTTP/1.1" 200 OK
-[36mapi_1  |[0m INFO:     172.19.0.1:40632 - "GET /games/all-info HTTP/1.1" 200 OK
-[36mapi_1  |[0m INFO:     172.19.0.1:41478 - "GET /auth/me HTTP/1.1" 200 OK
-[36mapi_1  |[0m INFO:     172.19.0.1:41478 - "GET /auth/me HTTP/1.1" 200 OK
-[36mapi_1  |[0m INFO:     172.19.0.1:39656 - "GET /auth/me HTTP/1.1" 200 OK
-[36mapi_1  |[0m INFO:     172.19.0.1:39642 - "GET /auth/me HTTP/1.1" 200 OK
-[36mapi_1  |[0m INFO:     172.19.0.1:39700 - "GET /games/user_list HTTP/1.1" 200 OK
-[36mapi_1  |[0m INFO:     172.19.0.1:39686 - "GET /games/user_list HTTP/1.1" 200 OK
-[36mapi_1  |[0m INFO:     172.19.0.1:39680 - "GET /games/all-info HTTP/1.1" 200 OK
-[36mapi_1  |[0m INFO:     172.19.0.1:39672 - "GET /games/all-info HTTP/1.1" 200 OK
-[36mapi_1  |[0m INFO:     172.19.0.1:59096 - "OPTIONS /hardware/gpus/search?q=5&limit=10 HTTP/1.1" 200 OK
-[36mapi_1  |[0m INFO:     172.19.0.1:59096 - "OPTIONS /hardware/gpus/search?q=50&limit=10 HTTP/1.1" 200 OK
-[36mapi_1  |[0m INFO:     172.19.0.1:59110 - "GET /hardware/gpus/search?q=5&limit=10 HTTP/1.1" 200 OK
-[36mapi_1  |[0m INFO:     172.19.0.1:59096 - "OPTIONS /hardware/gpus/search?q=506&limit=10 HTTP/1.1" 200 OK
-[36mapi_1  |[0m INFO:     172.19.0.1:59112 - "GET /hardware/gpus/search?q=50&limit=10 HTTP/1.1" 200 OK
-[36mapi_1  |[0m INFO:     172.19.0.1:59110 - "GET /hardware/gpus/search?q=506&limit=10 HTTP/1.1" 200 OK
-[36mapi_1  |[0m INFO:     172.19.0.1:59096 - "OPTIONS /profile/edit_setup HTTP/1.1" 200 OK
-[36mapi_1  |[0m INFO:     172.19.0.1:59112 - "POST /profile/edit_setup HTTP/1.1" 200 OK
+[36mapi_1  |[0m INFO:     172.19.0.1:52578 - "GET /health HTTP/1.1" 200 OK
+[36mapi_1  |[0m INFO:     172.19.0.1:52590 - "OPTIONS /auth/login HTTP/1.1" 200 OK
+[36mapi_1  |[0m [EMAIL] Iniciando envio para luislobato35@gmail.com
+[36mapi_1  |[0m [EMAIL] Conectando ao smtp.gmail.com:587
+[36mapi_1  |[0m [EMAIL] Iniciando TLS
+[36mapi_1  |[0m [EMAIL] Fazendo login com artiscsolutions@gmail.com
+[36mapi_1  |[0m [EMAIL] Enviando mensagem
+[36mapi_1  |[0m [EMAIL] ✅ Email enviado com sucesso para luislobato35@gmail.com
+[36mapi_1  |[0m INFO:     172.19.0.1:52602 - "POST /auth/login HTTP/1.1" 200 OK
+[36mapi_1  |[0m INFO:     172.19.0.1:52602 - "POST /auth/refresh_token HTTP/1.1" 401 Unauthorized
+[36mapi_1  |[0m [EMAIL] Iniciando envio para luislobato35@gmail.com
+[36mapi_1  |[0m [EMAIL] Conectando ao smtp.gmail.com:587
+[36mapi_1  |[0m [EMAIL] Iniciando TLS
+[36mapi_1  |[0m [EMAIL] Fazendo login com artiscsolutions@gmail.com
+[36mapi_1  |[0m [EMAIL] Enviando mensagem
+[36mapi_1  |[0m [EMAIL] ✅ Email enviado com sucesso para luislobato35@gmail.com
+[36mapi_1  |[0m INFO:     172.19.0.1:60310 - "POST /auth/login HTTP/1.1" 200 OK
