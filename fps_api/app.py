@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import os
 from fastapi.responses import FileResponse
+import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address

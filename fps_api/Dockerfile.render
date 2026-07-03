@@ -1,0 +1,30 @@
+# ---------- Stage 1: build do frontend (Vite/React) ----------
+FROM node:20-alpine AS frontend-build
+WORKDIR /app/client
+COPY client/package*.json ./
+RUN npm ci
+COPY client/ ./
+# Same-origin em produção: URL da API relativa, sem precisar de domínio fixo
+ARG VITE_API_URL=
+ENV VITE_API_URL=${VITE_API_URL}
+RUN npm run build
+
+# ---------- Stage 2: backend Python servindo API + estáticos ----------
+FROM python:3.11-slim
+WORKDIR /app
+
+COPY fps_api/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY fps_api/ ./fps_api/
+COPY model/ ./model/
+COPY data/ ./data/
+
+# Pega o resultado do build do frontend (só o dist, sem node_modules)
+COPY --from=frontend-build /app/client/dist ./client/dist
+
+ENV PYTHONPATH=/app
+EXPOSE 8000
+
+# $PORT é injetado automaticamente pelo Render; 8000 é fallback pra rodar solto localmente
+CMD ["sh", "-c", "uvicorn fps_api.app:app --host 0.0.0.0 --port ${PORT:-8000}"]
