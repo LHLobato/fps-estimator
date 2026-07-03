@@ -1,22 +1,21 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import * as hardwareAPI from '../api/hardware';
 
 function useDebouncedHardwareSearch(searchTerm, fetcher, resultKey, limit = 10, debounceMs = 300) {
+  const term = useMemo(() => searchTerm.trim(), [searchTerm]);
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const term = searchTerm.trim();
     if (!term) {
-      setResults([]);
-      setLoading(false);
       return undefined;
     }
 
     let cancelled = false;
-    setLoading(true);
 
     const timer = setTimeout(async () => {
+      setLoading(true);
+
       try {
         const data = await fetcher(term, limit);
         if (!cancelled) {
@@ -38,9 +37,9 @@ function useDebouncedHardwareSearch(searchTerm, fetcher, resultKey, limit = 10, 
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [searchTerm, limit, debounceMs]);
+  }, [term, fetcher, resultKey, limit, debounceMs]);
 
-  return { results, loading };
+  return { results: term ? results : [], loading: term ? loading : false };
 }
 
 export function useCpuSearch(searchTerm, limit = 10, debounceMs = 300) {

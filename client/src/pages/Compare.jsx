@@ -1,5 +1,4 @@
-import { useState, useEffect } from 'react';
-import DashboardGrid from '../components/DashboardGrid';
+import { useEffect, useState } from 'react';
 import GlassCard from '../components/GlassCard';
 import { HardwareSearchInput } from '../components/HardwareSearchInput';
 import * as llmAPI from '../api/llm';
@@ -8,6 +7,16 @@ import { useGameSearch } from '../hooks/useGameSearch';
 import { useCpuSearch, useGpuSearch } from '../hooks/useHardwareSearch';
 import { filterRamOptions } from '../utils/filterRam';
 
+const getValidImageUrl = (url) => {
+  if (!url || typeof url !== 'string') return null;
+  const clean = url.trim();
+  if (['', 'null', 'none', 'undefined'].includes(clean.toLowerCase())) return null;
+  if (clean.startsWith('//')) return `https:${clean}`;
+  return clean;
+};
+
+const roundFps = (value) => Math.round(Number(value) || 0);
+
 export default function Compare() {
   const [rams] = useState([
     '128GB DDR5', '64GB DDR5', '32GB DDR5', '16GB DDR5', '8GB DDR5', '4GB DDR5',
@@ -15,7 +24,6 @@ export default function Compare() {
     '128GB DDR3', '64GB DDR3', '32GB DDR3', '16GB DDR3', '8GB DDR3', '4GB DDR3',
   ]);
 
-  // Setup 1 State
   const [setup1CPU, setSetup1CPU] = useState('');
   const [setup1GPU, setSetup1GPU] = useState('');
   const [setup1RAM, setSetup1RAM] = useState('');
@@ -23,7 +31,6 @@ export default function Compare() {
   const [setup1GPUSearch, setSetup1GPUSearch] = useState('');
   const [setup1RAMSearch, setSetup1RAMSearch] = useState('');
 
-  // Setup 2 State
   const [setup2CPU, setSetup2CPU] = useState('');
   const [setup2GPU, setSetup2GPU] = useState('');
   const [setup2RAM, setSetup2RAM] = useState('');
@@ -31,10 +38,13 @@ export default function Compare() {
   const [setup2GPUSearch, setSetup2GPUSearch] = useState('');
   const [setup2RAMSearch, setSetup2RAMSearch] = useState('');
 
-  // Comparison State
   const [compareGame, setCompareGame] = useState('');
   const [compareGameImage, setCompareGameImage] = useState(null);
   const [compareGameSearch, setCompareGameSearch] = useState('');
+  const [selectedPreset, setSelectedPreset] = useState('HIGH');
+  const [selectedResolution, setSelectedResolution] = useState('1440P');
+  const [setup1Upscaling, setSetup1Upscaling] = useState('No');
+  const [setup2Upscaling, setSetup2Upscaling] = useState('No');
   const [result1, setResult1] = useState(null);
   const [result2, setResult2] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -49,10 +59,11 @@ export default function Compare() {
           if (user.gpu) setSetup1GPU(user.gpu);
           if (user.ram) setSetup1RAM(user.ram);
         }
-      } catch (err) {
-        console.log("User not logged in, the fields will remain empty.");
+      } catch {
+        console.log('User not logged in, the fields will remain empty.');
       }
     };
+
     loadUserHardware();
   }, []);
 
@@ -64,7 +75,51 @@ export default function Compare() {
   const filteredSetup1RAMs = filterRamOptions(rams, setup1RAMSearch, 10);
   const filteredSetup2RAMs = filterRamOptions(rams, setup2RAMSearch, 10);
 
-  const handleCompare = async () => {
+  const presets = ['ULTRA', 'HIGH', 'MEDIUM', 'LOW'];
+  const resolutions = ['1080P', '1440P', '4K_UHD'];
+  const upscalingOptions = ['No', 'DLSS', 'FSR', 'XeSS'];
+
+  const hasResults = Boolean(result1 && result2);
+  const metrics = hasResults
+    ? [
+        { label: 'MIN', setup1: roundFps(result1.min_fps), setup2: roundFps(result2.min_fps) },
+        { label: 'AVG', setup1: roundFps(result1.avg_fps), setup2: roundFps(result2.avg_fps) },
+        { label: 'MAX', setup1: roundFps(result1.max_fps), setup2: roundFps(result2.max_fps) },
+      ]
+    : [];
+  const maxMetricValue = Math.max(...metrics.flatMap((item) => [item.setup1, item.setup2]), 1);
+
+  const setup1Avg = result1 ? roundFps(result1.avg_fps) : 0;
+  const setup2Avg = result2 ? roundFps(result2.avg_fps) : 0;
+  const winner = setup1Avg >= setup2Avg ? 'SETUP_01' : 'SETUP_02';
+  const winnerColor = winner === 'SETUP_01' ? 'text-cyan-400' : 'text-secondary';
+  const diff = Math.abs(setup1Avg - setup2Avg);
+  const diffPercent = hasResults ? ((diff / Math.max(Math.min(setup1Avg, setup2Avg), 1)) * 100).toFixed(1) : '0.0';
+
+  const setupSummary = [
+    {
+      id: 'SETUP_01',
+      accent: 'cyan',
+      cpu: setup1CPU,
+      gpu: setup1GPU,
+      ram: setup1RAM,
+      upscaling: setup1Upscaling,
+      result: result1,
+    },
+    {
+      id: 'SETUP_02',
+      accent: 'secondary',
+      cpu: setup2CPU,
+      gpu: setup2GPU,
+      ram: setup2RAM,
+      upscaling: setup2Upscaling,
+      result: result2,
+    },
+  ];
+
+  const handleCompare = async (event) => {
+    event.preventDefault();
+
     if (!setup1CPU || !setup1GPU || !setup1RAM || !setup2CPU || !setup2GPU || !setup2RAM || !compareGame) {
       setError('SYSTEM_WARNING: Fill in all required fields for analysis.');
       return;
@@ -78,9 +133,9 @@ export default function Compare() {
     try {
       const estimateData1 = {
         gamename: compareGame,
-        preset: 'HIGH',
-        resolution: '1440P',
-        upscaling: 'DLSS',
+        preset: selectedPreset,
+        resolution: selectedResolution,
+        upscaling: setup1Upscaling,
         gpu: setup1GPU,
         cpu: setup1CPU,
         ram: setup1RAM,
@@ -88,9 +143,9 @@ export default function Compare() {
 
       const estimateData2 = {
         gamename: compareGame,
-        preset: 'HIGH',
-        resolution: '1440P',
-        upscaling: 'DLSS',
+        preset: selectedPreset,
+        resolution: selectedResolution,
+        upscaling: setup2Upscaling,
         gpu: setup2GPU,
         cpu: setup2CPU,
         ram: setup2RAM,
@@ -110,425 +165,467 @@ export default function Compare() {
     }
   };
 
-  const getAdvantage = () => {
-    if (!result1 || !result2) return null;
-    const diff = result1.avg_fps - result2.avg_fps;
-    const isSetup1Winner = diff >= 0;
-    const absoluteDiff = Math.abs(diff);
-    
-    const base = isSetup1Winner ? result2.avg_fps : result1.avg_fps;
-    const percent = ((absoluteDiff / base) * 100).toFixed(1);
+  const renderRamInput = ({ labelColor, search, onSearchChange, filtered, selected, onSelect }) => (
+    <div>
+      <label className={`block font-label-caps text-[12px] ${labelColor} mb-2`}>RAM</label>
+      <div className="relative">
+        <input
+          type="text"
+          placeholder="Search RAM..."
+          value={search}
+          onChange={(event) => onSearchChange(event.target.value)}
+          className="w-full bg-transparent border-b border-white/20 focus:border-cyan-400 py-3 px-0 text-white font-body-md outline-none transition-all placeholder:text-slate-600"
+        />
+        {search && filtered.length > 0 && (
+          <div className="absolute top-full left-0 right-0 z-50 mt-2 max-h-48 overflow-y-auto rounded border border-cyan-500/40 bg-slate-900">
+            {filtered.map((ram) => (
+              <button
+                key={ram}
+                type="button"
+                onClick={() => onSelect(ram)}
+                className="w-full border-b border-white/5 px-4 py-3 text-left text-sm text-cyan-300 transition-colors hover:bg-cyan-500/30 hover:text-cyan-100"
+              >
+                {ram}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+      {selected && <p className={`mt-2 text-xs ${labelColor}`}>Selected: {selected}</p>}
+    </div>
+  );
 
-    return {
-      winnerName: isSetup1Winner ? 'SETUP_01' : 'SETUP_02',
-      percent,
-      diff: absoluteDiff,
-      textColor: isSetup1Winner ? 'text-cyan-400' : 'text-[color:var(--secondary-violet,#b600f8)]',
-      borderColor: isSetup1Winner ? 'border-cyan-500' : 'border-[color:var(--secondary-violet,#b600f8)]'
-    };
+  const renderSetupForm = ({
+    title,
+    accent,
+    cpu,
+    gpu,
+    ram,
+    cpuSearch,
+    gpuSearch,
+    ramSearch,
+    onCpuSearch,
+    onGpuSearch,
+    onRamSearch,
+    cpuResults,
+    gpuResults,
+    cpuLoading,
+    gpuLoading,
+    onCpuSelect,
+    onGpuSelect,
+    onRamSelect,
+    filteredRams,
+    upscaling,
+    onUpscalingChange,
+  }) => {
+    const labelColor = accent === 'cyan' ? 'text-cyan-500' : 'text-secondary';
+    const borderColor = accent === 'cyan' ? 'border-cyan-500/30' : 'border-secondary/30';
+
+    return (
+      <section className={`rounded border ${borderColor} bg-slate-950/25 p-4 sm:p-5`}>
+        <div className="mb-6 flex items-center justify-between border-b border-white/10 pb-4">
+          <p className={`font-label-caps text-[12px] tracking-widest ${labelColor}`}>{title}</p>
+          <span className={`h-2 w-2 rounded-full ${accent === 'cyan' ? 'bg-cyan-400' : 'bg-secondary'}`}></span>
+        </div>
+
+        <div className="space-y-6">
+          <HardwareSearchInput
+            label="CPU"
+            placeholder="Search CPU..."
+            search={cpuSearch}
+            onSearchChange={onCpuSearch}
+            results={cpuResults}
+            loading={cpuLoading}
+            selected={cpu}
+            onSelect={onCpuSelect}
+          />
+
+          <HardwareSearchInput
+            label="GPU"
+            placeholder="Search GPU..."
+            search={gpuSearch}
+            onSearchChange={onGpuSearch}
+            results={gpuResults}
+            loading={gpuLoading}
+            selected={gpu}
+            onSelect={onGpuSelect}
+          />
+
+          {renderRamInput({
+            labelColor,
+            search: ramSearch,
+            onSearchChange: onRamSearch,
+            filtered: filteredRams,
+            selected: ram,
+            onSelect: onRamSelect,
+          })}
+
+          <div>
+            <label className={`mb-3 block font-label-caps text-[12px] ${labelColor}`}>UPSCALING_METHOD</label>
+            <div className="grid grid-cols-2 gap-2">
+              {upscalingOptions.map((method) => (
+                <button
+                  key={method}
+                  type="button"
+                  onClick={() => onUpscalingChange(method)}
+                  className={`px-3 py-2 text-xs font-label-caps transition-all ${
+                    upscaling === method
+                      ? `${accent === 'cyan' ? 'border-cyan-500 bg-cyan-500/20 text-cyan-400' : 'border-slate-300 bg-slate-300/15 text-slate-100'} border`
+                      : 'border border-white/10 bg-slate-900 text-slate-400 hover:border-cyan-500 hover:text-cyan-400'
+                  }`}
+                >
+                  {method}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+    );
   };
 
-  const advantage = getAdvantage();
+  const renderGameSelector = () => (
+    <div>
+      <label className="block font-label-caps text-[12px] text-cyan-500 mb-2">GAME_TITLE</label>
+      <div className="relative z-50">
+        <input
+          type="text"
+          placeholder="Search game..."
+          value={compareGameSearch}
+          onChange={(event) => setCompareGameSearch(event.target.value)}
+          className="w-full bg-transparent border-b border-white/20 focus:border-cyan-400 py-3 px-0 text-white font-body-md outline-none transition-all placeholder:text-slate-600"
+        />
+        {compareGameLoading && <p className="text-xs text-slate-500 mt-2">Searching the database...</p>}
 
-  // Dados calculados para o gráfico dinâmico
-  const maxFpsValue = result1 && result2 ? Math.max(result1.max_fps, result2.max_fps) * 1.15 : 100; // +15% de margem no topo do gráfico
+        {compareGameSearch && !compareGameLoading && compareGameResults.length > 0 && (
+          <div className="absolute top-full left-0 right-0 z-50 mt-2 max-h-64 overflow-y-auto rounded border border-cyan-500/40 bg-slate-900 shadow-2xl">
+            {compareGameResults.map((game) => {
+              const imgUrl = getValidImageUrl(game.image_url);
+
+              return (
+                <button
+                  key={game.id}
+                  type="button"
+                  onClick={() => {
+                    setCompareGame(game.name);
+                    setCompareGameImage(imgUrl);
+                    setCompareGameSearch('');
+                  }}
+                  className="group flex w-full items-center gap-3 border-b border-white/5 px-4 py-2 text-left transition-colors hover:bg-cyan-500/20"
+                >
+                  <div className="relative flex h-10 w-[86px] shrink-0 items-center justify-center overflow-hidden rounded border border-white/10 bg-slate-950/70">
+                    <span className="material-symbols-outlined absolute z-0 text-[16px] text-slate-500">image</span>
+                    {imgUrl && (
+                      <img
+                        src={imgUrl}
+                        alt={game.name}
+                        className="relative z-10 h-full w-full object-contain opacity-80 group-hover:opacity-100"
+                        onError={(event) => event.currentTarget.style.display = 'none'}
+                      />
+                    )}
+                  </div>
+                  <span className="text-sm text-cyan-300 group-hover:text-cyan-100">{game.name}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {compareGame && (
+        <div className="mt-4 flex items-center gap-4 rounded-lg border border-cyan-500/30 bg-slate-900/50 p-4">
+          <div className="relative flex aspect-[460/215] w-32 shrink-0 items-center justify-center overflow-hidden rounded border border-white/10 bg-slate-950/70 sm:w-40">
+            <span className="material-symbols-outlined absolute z-0 text-slate-500">sports_esports</span>
+            {compareGameImage && (
+              <img
+                src={compareGameImage}
+                alt={compareGame}
+                className="relative z-10 h-full w-full object-contain shadow-[0_0_15px_rgba(0,240,255,0.2)]"
+                onError={(event) => event.currentTarget.style.display = 'none'}
+              />
+            )}
+          </div>
+          <div className="min-w-0">
+            <p className="mb-1 flex items-center gap-1 font-label-caps text-[10px] text-cyan-500">
+              <span className="material-symbols-outlined text-[12px]">check_circle</span>
+              SELECTED_TARGET
+            </p>
+            <p className="truncate font-headline-md text-white">{compareGame}</p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  const renderResultPanel = () => (
+    <GlassCard title="COMPARISON_RESULT" className="relative min-h-[420px] overflow-hidden">
+      <div className="absolute top-0 left-0 h-full w-1 bg-cyan-500"></div>
+
+      {hasResults ? (
+        <div className="space-y-6 p-1 sm:p-4">
+          <div className="rounded border border-white/10 bg-slate-900/50 p-4 text-center">
+            <p className={`font-label-caps text-[11px] ${winnerColor}`}>{winner} ADVANTAGE</p>
+            <p className={`mt-2 text-5xl font-data-display ${winnerColor}`}>+{diffPercent}%</p>
+            <p className="mt-1 text-xs text-slate-500">{diff} FPS average difference</p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded border border-cyan-400/30 bg-cyan-500/10 p-4 text-center">
+              <p className="font-label-caps text-[10px] text-cyan-300">SETUP_01 AVG</p>
+              <p className="mt-2 text-4xl font-data-display text-cyan-400">{setup1Avg}</p>
+            </div>
+            <div className="rounded border border-secondary/30 bg-secondary/10 p-4 text-center">
+              <p className="font-label-caps text-[10px] text-secondary">SETUP_02 AVG</p>
+              <p className="mt-2 text-4xl font-data-display text-secondary">{setup2Avg}</p>
+            </div>
+          </div>
+
+          <div className="space-y-4 border-t border-white/10 pt-5">
+            <p className="font-label-caps text-[11px] text-slate-500">MIN_AVG_MAX_BENCHMARK</p>
+            {metrics.map((item) => (
+              <div key={item.label} className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-label-caps text-[10px] text-slate-400">{item.label}</span>
+                  <span className="text-xs text-slate-500">{Math.abs(item.setup1 - item.setup2)} FPS gap</span>
+                </div>
+                <div className="grid grid-cols-[1fr_42px] items-center gap-3">
+                  <div className="h-3 overflow-hidden rounded-full bg-slate-800">
+                    <div className="h-full rounded-full bg-cyan-400" style={{ width: `${Math.max(8, (item.setup1 / maxMetricValue) * 100)}%` }}></div>
+                  </div>
+                  <span className="text-right text-xs font-bold text-cyan-300">{item.setup1}</span>
+                </div>
+                <div className="grid grid-cols-[1fr_42px] items-center gap-3">
+                  <div className="h-3 overflow-hidden rounded-full bg-slate-800">
+                    <div className="h-full rounded-full bg-secondary" style={{ width: `${Math.max(8, (item.setup2 / maxMetricValue) * 100)}%` }}></div>
+                  </div>
+                  <span className="text-right text-xs font-bold text-secondary">{item.setup2}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="rounded border border-cyan-400/20 bg-cyan-500/5 p-3">
+            <p className="font-label-caps text-[10px] text-cyan-300">TEST_PROFILE</p>
+            <p className="mt-2 text-xs leading-relaxed text-slate-400">
+              {compareGame} at {selectedResolution} / {selectedPreset}. Setup 01 used {setup1Upscaling} upscale and Setup 02 used {setup2Upscaling} upscale.
+            </p>
+          </div>
+        </div>
+      ) : (
+        <div className="flex min-h-[330px] flex-col items-center justify-center gap-5 p-4 text-center">
+          <div className="relative h-44 w-44">
+            <div className="absolute inset-0 rounded-full border border-slate-600/60 bg-slate-900/70 shadow-[inset_0_0_45px_rgba(148,163,184,0.08)]"></div>
+            <div className="absolute left-1/2 top-1/2 h-16 w-1 origin-bottom -translate-x-1/2 -translate-y-full rotate-[-24deg] rounded-full bg-slate-500"></div>
+            <div className="absolute left-1/2 top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full bg-slate-400"></div>
+            <div className="absolute bottom-8 left-0 right-0 font-label-caps text-[10px] text-slate-500">DUEL READY</div>
+          </div>
+          <div>
+            <p className="font-label-caps text-[12px] text-slate-300">Ready for comparison</p>
+            <p className="mt-2 max-w-xs text-sm text-slate-500">Choose one game and two hardware profiles to compare predicted FPS.</p>
+          </div>
+        </div>
+      )}
+    </GlassCard>
+  );
 
   return (
-    <div className="w-full">
-      {/* HERO HEADER */}
-      <div className="mb-8">
-        <h2 className="font-headline-xl text-white tracking-tighter mb-2">
+    <div className="w-full overflow-x-hidden">
+      <div className="mb-6 lg:mb-8">
+        <h2 className="font-headline-xl text-4xl text-white tracking-normal sm:text-5xl">
           HARDWARE{' '}
           <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-secondary">
             COMPARISON
           </span>
         </h2>
-        <p className="text-slate-400 font-body-lg max-w-2xl">
-          Compare two hardware configurations side-by-side and see performance differences across games.
+        <p className="mt-2 max-w-2xl text-base text-slate-400 sm:text-lg">
+          Compare two builds under the same game, preset and resolution, with independent upscaling per setup.
         </p>
       </div>
 
-      <DashboardGrid>
-        {/* SETUP SELECTION */}
-        <div className="col-span-12">
-          <GlassCard title="SETUP_CONFIGURATION" className="relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-1 h-full bg-cyan-500"></div>
-            <form className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-              
-              {/* Setup 1 */}
+      <form onSubmit={handleCompare} className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,3fr)_minmax(360px,2fr)] xl:items-start">
+        <div className="space-y-5">
+          <GlassCard title="TEST_TARGET" className="relative min-h-0 overflow-visible">
+            <div className="absolute top-0 left-0 h-full w-1 bg-cyan-500"></div>
+            <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1.4fr)_minmax(280px,1fr)]">
+              {renderGameSelector()}
+
               <div className="space-y-6">
-                <div className="pb-4 border-b border-white/10">
-                  <p className="font-label-caps text-[12px] text-cyan-500 tracking-widest">SETUP_01</p>
+                <div>
+                  <label className="mb-4 block font-label-caps text-[12px] text-cyan-500">GRAPHICS_PRESET</label>
+                  <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+                    {presets.map((preset) => (
+                      <button
+                        key={preset}
+                        type="button"
+                        onClick={() => setSelectedPreset(preset)}
+                        className={`px-4 py-2 text-xs font-label-caps transition-all ${
+                          selectedPreset === preset
+                            ? 'border border-cyan-500 bg-cyan-500/20 text-cyan-400'
+                            : 'border border-white/10 bg-slate-900 text-slate-400 hover:border-cyan-500 hover:text-cyan-400'
+                        }`}
+                      >
+                        {preset}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
-                <HardwareSearchInput
-                  label="CPU"
-                  placeholder="Search CPU..."
-                  search={setup1CPUSearch}
-                  onSearchChange={setSetup1CPUSearch}
-                  results={setup1CpuResults}
-                  loading={setup1CpuLoading}
-                  selected={setup1CPU}
-                  onSelect={(name) => { setSetup1CPU(name); setSetup1CPUSearch(''); }}
-                />
-
-                <HardwareSearchInput
-                  label="GPU"
-                  placeholder="Search GPU..."
-                  search={setup1GPUSearch}
-                  onSearchChange={setSetup1GPUSearch}
-                  results={setup1GpuResults}
-                  loading={setup1GpuLoading}
-                  selected={setup1GPU}
-                  onSelect={(name) => { setSetup1GPU(name); setSetup1GPUSearch(''); }}
-                />
-
-                {/* Setup 1 - RAM */}
                 <div>
-                  <label className="block font-label-caps text-[12px] text-cyan-500 mb-2">RAM</label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      placeholder="Search RAM..."
-                      value={setup1RAMSearch}
-                      onChange={(e) => setSetup1RAMSearch(e.target.value)}
-                      className="w-full bg-transparent border-b border-white/20 focus:border-cyan-400 py-3 px-0 text-white font-body-md outline-none transition-all placeholder:text-slate-600"
-                    />
-                    {setup1RAMSearch && filteredSetup1RAMs.length > 0 && (
-                      <div className="absolute top-full left-0 right-0 bg-slate-900 border border-cyan-500/40 rounded mt-2 max-h-48 overflow-y-auto z-50">
-                        {filteredSetup1RAMs.map((ram) => (
-                          <button
-                            key={ram}
-                            type="button"
-                            onClick={() => { setSetup1RAM(ram); setSetup1RAMSearch(''); }}
-                            className="w-full px-4 py-2 text-left text-cyan-300 hover:bg-cyan-500/30 hover:text-cyan-100 transition-colors text-sm"
-                          >
-                            {ram}
-                          </button>
-                        ))}
-                      </div>
-                    )}
+                  <label className="mb-4 block font-label-caps text-[12px] text-cyan-500">TARGET_RESOLUTION</label>
+                  <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
+                    {resolutions.map((resolution) => (
+                      <button
+                        key={resolution}
+                        type="button"
+                        onClick={() => setSelectedResolution(resolution)}
+                        className={`px-3 py-2 text-xs font-label-caps transition-all ${
+                          selectedResolution === resolution
+                            ? 'border border-cyan-500 bg-cyan-500/20 text-cyan-400'
+                            : 'border border-white/10 bg-slate-900 text-slate-400 hover:border-cyan-500 hover:text-cyan-400'
+                        }`}
+                      >
+                        {resolution}
+                      </button>
+                    ))}
                   </div>
-                  {setup1RAM && <p className="text-xs text-cyan-400 mt-2">✓ {setup1RAM}</p>}
                 </div>
               </div>
+            </div>
+          </GlassCard>
 
-              {/* Setup 2 */}
-              <div className="space-y-6">
-                <div className="pb-4 border-b border-white/10">
-                  <p className="font-label-caps text-[12px] text-secondary tracking-widest">SETUP_02</p>
-                </div>
+          <GlassCard title="SETUP_CONFIGURATION" className="relative min-h-0 overflow-visible">
+            <div className="absolute top-0 left-0 h-full w-1 bg-cyan-500"></div>
+            <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+              {renderSetupForm({
+                title: 'SETUP_01',
+                accent: 'cyan',
+                cpu: setup1CPU,
+                gpu: setup1GPU,
+                ram: setup1RAM,
+                cpuSearch: setup1CPUSearch,
+                gpuSearch: setup1GPUSearch,
+                ramSearch: setup1RAMSearch,
+                onCpuSearch: setSetup1CPUSearch,
+                onGpuSearch: setSetup1GPUSearch,
+                onRamSearch: setSetup1RAMSearch,
+                cpuResults: setup1CpuResults,
+                gpuResults: setup1GpuResults,
+                cpuLoading: setup1CpuLoading,
+                gpuLoading: setup1GpuLoading,
+                onCpuSelect: (name) => { setSetup1CPU(name); setSetup1CPUSearch(''); },
+                onGpuSelect: (name) => { setSetup1GPU(name); setSetup1GPUSearch(''); },
+                onRamSelect: (ram) => { setSetup1RAM(ram); setSetup1RAMSearch(''); },
+                filteredRams: filteredSetup1RAMs,
+                upscaling: setup1Upscaling,
+                onUpscalingChange: setSetup1Upscaling,
+              })}
 
-                <HardwareSearchInput
-                  label="CPU"
-                  placeholder="Search CPU..."
-                  search={setup2CPUSearch}
-                  onSearchChange={setSetup2CPUSearch}
-                  results={setup2CpuResults}
-                  loading={setup2CpuLoading}
-                  selected={setup2CPU}
-                  onSelect={(name) => { setSetup2CPU(name); setSetup2CPUSearch(''); }}
-                />
+              {renderSetupForm({
+                title: 'SETUP_02',
+                accent: 'secondary',
+                cpu: setup2CPU,
+                gpu: setup2GPU,
+                ram: setup2RAM,
+                cpuSearch: setup2CPUSearch,
+                gpuSearch: setup2GPUSearch,
+                ramSearch: setup2RAMSearch,
+                onCpuSearch: setSetup2CPUSearch,
+                onGpuSearch: setSetup2GPUSearch,
+                onRamSearch: setSetup2RAMSearch,
+                cpuResults: setup2CpuResults,
+                gpuResults: setup2GpuResults,
+                cpuLoading: setup2CpuLoading,
+                gpuLoading: setup2GpuLoading,
+                onCpuSelect: (name) => { setSetup2CPU(name); setSetup2CPUSearch(''); },
+                onGpuSelect: (name) => { setSetup2GPU(name); setSetup2GPUSearch(''); },
+                onRamSelect: (ram) => { setSetup2RAM(ram); setSetup2RAMSearch(''); },
+                filteredRams: filteredSetup2RAMs,
+                upscaling: setup2Upscaling,
+                onUpscalingChange: setSetup2Upscaling,
+              })}
+            </div>
 
-                <HardwareSearchInput
-                  label="GPU"
-                  placeholder="Search GPU..."
-                  search={setup2GPUSearch}
-                  onSearchChange={setSetup2GPUSearch}
-                  results={setup2GpuResults}
-                  loading={setup2GpuLoading}
-                  selected={setup2GPU}
-                  onSelect={(name) => { setSetup2GPU(name); setSetup2GPUSearch(''); }}
-                />
-
-                {/* Setup 2 - RAM */}
-                <div>
-                  <label className="block font-label-caps text-[12px] text-secondary mb-2">RAM</label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      placeholder="Search RAM..."
-                      value={setup2RAMSearch}
-                      onChange={(e) => setSetup2RAMSearch(e.target.value)}
-                      className="w-full bg-transparent border-b border-white/20 focus:border-secondary py-3 px-0 text-white font-body-md outline-none transition-all placeholder:text-slate-600"
-                    />
-                    {setup2RAMSearch && filteredSetup2RAMs.length > 0 && (
-                      <div className="absolute top-full left-0 right-0 bg-slate-900 border border-secondary/40 rounded mt-2 max-h-48 overflow-y-auto z-50">
-                        {filteredSetup2RAMs.map((ram) => (
-                          <button
-                            key={ram}
-                            type="button"
-                            onClick={() => { setSetup2RAM(ram); setSetup2RAMSearch(''); }}
-                            className="w-full px-4 py-2 text-left text-[color:var(--secondary-violet,#b600f8)] hover:bg-secondary/30 transition-colors text-sm"
-                          >
-                            {ram}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  {setup2RAM && <p className="text-xs text-secondary mt-2">✓ {setup2RAM}</p>}
-                </div>
+            {error && (
+              <div className="mt-5 rounded border border-red-500/40 bg-red-900/20 p-4 text-sm text-red-400 font-label-caps">
+                {error}
               </div>
-            </form>
+            )}
+
+            <div className="mt-5 border-t border-white/10 pt-5">
+              <button
+                type="submit"
+                disabled={loading}
+                className="h-14 w-full rounded bg-gradient-to-r from-cyan-400 to-secondary px-4 font-label-caps text-xs font-bold tracking-[0.22em] text-slate-950 shadow-[0_0_30px_rgba(0,240,255,0.24)] transition-transform active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm"
+              >
+                {loading ? 'ANALYZING TELEMETRY...' : 'COMPARE PERFORMANCE'}
+              </button>
+            </div>
           </GlassCard>
         </div>
 
-        {/* GAME SELECTION FOR COMPARISON */}
-        <div className="col-span-12 lg:col-span-6">
-          <GlassCard title="SELECT_GAME" className="relative min-h-[200px]">
-            <div className="absolute top-0 left-0 w-1 h-full bg-cyan-500"></div>
-            <div className="relative z-50 pt-4 flex flex-col h-full">
-              <label className="block font-label-caps text-[12px] text-cyan-500 mb-2">GAME_TITLE</label>
-              
-              <input
-                type="text"
-                placeholder="Search game..."
-                value={compareGameSearch}
-                onChange={(e) => setCompareGameSearch(e.target.value)}
-                className="w-full bg-transparent border-b border-white/20 focus:border-cyan-400 py-3 px-0 text-white font-body-md outline-none transition-all placeholder:text-slate-600"
-              />
-              
-              {compareGameLoading && <p className="text-xs text-slate-500 mt-2">Buscando na database...</p>}
-              
-              {/* DROPDOWN COM IMAGENS */}
-              {compareGameSearch && !compareGameLoading && compareGameResults.length > 0 && (
-                <div className="absolute top-full left-0 right-0 bg-slate-900 border border-cyan-500/40 rounded mt-2 max-h-64 overflow-y-auto z-50 shadow-2xl">
-                  {compareGameResults.map((game) => (
-                    <button
-                      key={game.id}
-                      type="button"
-                      onClick={() => { 
-                        setCompareGame(game.name); 
-                        setCompareGameImage(game.image_url);
-                        setCompareGameSearch(''); 
-                      }}
-                      className="w-full px-4 py-2 text-left hover:bg-cyan-500/20 transition-colors border-b border-white/5 flex items-center gap-3 group"
-                    >
-                      {game.image_url ? (
-                        <img src={game.image_url} alt={game.name} className="w-8 h-10 object-cover rounded opacity-80 group-hover:opacity-100" />
-                      ) : (
-                        <div className="w-8 h-10 bg-slate-800 rounded flex items-center justify-center">
-                          <span className="material-symbols-outlined text-[16px] text-slate-500">image</span>
-                        </div>
-                      )}
-                      <span className="text-sm text-cyan-300 group-hover:text-cyan-100">{game.name}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-              
-              {compareGameSearch && !compareGameLoading && compareGameResults.length === 0 && (
-                <p className="text-xs text-slate-500 mt-2">Nenhum título encontrado.</p>
-              )}
+        <div className="xl:sticky xl:top-24">
+          {renderResultPanel()}
+        </div>
+      </form>
 
-              {/* CARTÃO DO JOGO SELECIONADO */}
-              {compareGame && (
-                <div className="mt-6 flex items-center gap-4 p-4 bg-slate-900/50 border border-cyan-500/30 rounded-lg">
-                  {compareGameImage ? (
-                    <img 
-                      src={compareGameImage} 
-                      alt={compareGame} 
-                      className="w-14 h-20 object-cover rounded shadow-[0_0_15px_rgba(0,240,255,0.2)]" 
-                    />
-                  ) : (
-                    <div className="w-14 h-20 bg-slate-800 rounded border border-white/10 flex items-center justify-center">
-                      <span className="material-symbols-outlined text-slate-500">sports_esports</span>
-                    </div>
-                  )}
+      {hasResults && (
+        <div className="mt-6 grid grid-cols-1 gap-5 lg:grid-cols-2">
+          {setupSummary.map((setup) => {
+            const avg = roundFps(setup.result.avg_fps);
+            const min = roundFps(setup.result.min_fps);
+            const max = roundFps(setup.result.max_fps);
+            const stability = avg > 0 ? Math.min(100, Math.round((min / avg) * 100)) : 0;
+            const frameTime = avg > 0 ? (1000 / avg).toFixed(1) : '0.0';
+            const isCyan = setup.accent === 'cyan';
+
+            return (
+              <GlassCard key={setup.id} title={`${setup.id}_DETAILS`} className="relative min-h-0 overflow-hidden">
+                <div className={`absolute top-0 left-0 h-full w-1 ${isCyan ? 'bg-cyan-500' : 'bg-secondary'}`}></div>
+                <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <p className="font-label-caps text-[10px] text-cyan-500 mb-1 flex items-center gap-1">
-                      <span className="material-symbols-outlined text-[12px]">check_circle</span>
-                      SELECTED_TARGET
-                    </p>
-                    <p className="font-headline-md text-white">{compareGame}</p>
+                    <p className="font-label-caps text-[10px] text-slate-500">AVG FPS</p>
+                    <p className={`mt-1 text-5xl font-data-display ${isCyan ? 'text-cyan-400' : 'text-secondary'}`}>{avg}</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-center">
+                    <div className="rounded border border-white/10 bg-slate-900/50 p-3">
+                      <p className="font-label-caps text-[9px] text-slate-500">STABILITY</p>
+                      <p className="mt-1 text-lg font-bold text-white">{stability}%</p>
+                    </div>
+                    <div className="rounded border border-white/10 bg-slate-900/50 p-3">
+                      <p className="font-label-caps text-[9px] text-slate-500">FRAME</p>
+                      <p className="mt-1 text-lg font-bold text-white">{frameTime}ms</p>
+                    </div>
                   </div>
                 </div>
-              )}
-            </div>
-          </GlassCard>
+
+                <div className="mt-5 grid grid-cols-3 gap-2 text-center">
+                  <div className="rounded bg-slate-900/45 p-3">
+                    <p className="font-label-caps text-[9px] text-slate-500">MIN</p>
+                    <p className="text-lg font-bold text-slate-200">{min}</p>
+                  </div>
+                  <div className="rounded bg-slate-900/45 p-3">
+                    <p className="font-label-caps text-[9px] text-slate-500">AVG</p>
+                    <p className="text-lg font-bold text-slate-200">{avg}</p>
+                  </div>
+                  <div className="rounded bg-slate-900/45 p-3">
+                    <p className="font-label-caps text-[9px] text-slate-500">MAX</p>
+                    <p className="text-lg font-bold text-slate-200">{max}</p>
+                  </div>
+                </div>
+
+                <div className="mt-5 rounded border border-white/10 bg-black/20 p-4">
+                  <p className="text-xs leading-relaxed text-slate-400">
+                    <span className={isCyan ? 'text-cyan-400' : 'text-secondary'}>CPU:</span> {setup.cpu}<br />
+                    <span className={isCyan ? 'text-cyan-400' : 'text-secondary'}>GPU:</span> {setup.gpu}<br />
+                    <span className={isCyan ? 'text-cyan-400' : 'text-secondary'}>RAM:</span> {setup.ram}<br />
+                    <span className={isCyan ? 'text-cyan-400' : 'text-secondary'}>UPSCALING:</span> {setup.upscaling}
+                  </p>
+                </div>
+              </GlassCard>
+            );
+          })}
         </div>
-
-        {/* COMPARE BUTTON */}
-        <div className="col-span-12 lg:col-span-6">
-          <GlassCard title="ACTION" className="relative overflow-hidden h-full flex flex-col justify-end">
-            <div className="absolute top-0 left-0 w-1 h-full bg-cyan-500"></div>
-            <button
-              onClick={handleCompare}
-              disabled={loading}
-              className="w-full h-16 bg-gradient-to-r from-cyan-400 to-secondary text-slate-950 font-label-caps text-sm font-bold tracking-[0.3em] rounded transition-transform active:scale-[0.98] shadow-[0_0_30px_rgba(0,240,255,0.3)] disabled:opacity-50 disabled:cursor-not-allowed mt-auto"
-            >
-              {loading ? 'ANALYZING TELEMETRY...' : 'COMPARE PERFORMANCE'}
-            </button>
-          </GlassCard>
-        </div>
-
-        {/* ERROR MESSAGE */}
-        {error && (
-          <div className="col-span-12">
-            <GlassCard className="relative overflow-hidden bg-red-900/20 border border-red-500/40">
-              <p className="text-red-400 text-sm font-label-caps tracking-widest">{error}</p>
-            </GlassCard>
-          </div>
-        )}
-
-        {/* COMPARISON RESULTS */}
-        {result1 && result2 && advantage && (
-          <>
-            {/* VANTAGEM GERAL */}
-            <div className="col-span-12">
-              <GlassCard title="PERFORMANCE_ADVANTAGE" className={`relative overflow-hidden border ${advantage.borderColor}`}>
-                <div className={`absolute top-0 left-0 w-1 h-full bg-current ${advantage.textColor}`}></div>
-                <div className="flex flex-col md:flex-row items-center justify-between gap-8 py-4">
-                  <div>
-                    <p className={`font-label-caps text-[12px] mb-2 ${advantage.textColor}`}>
-                      {advantage.winnerName} ADVANTAGE
-                    </p>
-                    <p className={`text-6xl font-data-display ${advantage.textColor}`}>
-                      +{advantage.percent}%
-                    </p>
-                  </div>
-                  <div className="hidden md:block w-px h-16 bg-white/10"></div>
-                  <div className="text-left md:text-right">
-                    <p className="font-label-caps text-[12px] text-slate-500 mb-2">RAW FPS DIFFERENCE</p>
-                    <p className={`text-5xl font-data-display ${advantage.textColor}`}>
-                      {advantage.diff} <span className="text-sm font-label-caps text-slate-400">FPS</span>
-                    </p>
-                  </div>
-                </div>
-              </GlassCard>
-            </div>
-
-            {/* GRÁFICO VISUAL (Construído via Tailwind CSS) */}
-            <div className="col-span-12">
-              <GlassCard title="VISUAL_BENCHMARK_ANALYSIS" className="relative overflow-hidden pt-8">
-                <div className="absolute top-0 left-0 w-1 h-full bg-slate-500"></div>
-                
-                {/* Legenda do Gráfico */}
-                <div className="flex justify-center gap-8 mb-8">
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 bg-cyan-400 rounded-full shadow-[0_0_8px_rgba(0,240,255,0.6)]"></div>
-                    <span className="font-label-caps text-[10px] text-slate-400">SETUP_01</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 bg-secondary rounded-full shadow-[0_0_8px_var(--secondary-violet)]"></div>
-                    <span className="font-label-caps text-[10px] text-slate-400">SETUP_02</span>
-                  </div>
-                </div>
-
-                {/* Área do Gráfico de Barras */}
-                <div className="flex h-56 items-end justify-around gap-2 px-2 md:px-12 border-b border-white/10 pb-4 relative">
-                  
-                  {/* Linhas de Grade de Fundo (Opcional, dá um ar mais técnico) */}
-                  <div className="absolute inset-0 flex flex-col justify-between pointer-events-none opacity-20 border-t border-white/10">
-                    <div className="w-full border-b border-dashed border-white/30 h-1/4"></div>
-                    <div className="w-full border-b border-dashed border-white/30 h-1/4"></div>
-                    <div className="w-full border-b border-dashed border-white/30 h-1/4"></div>
-                  </div>
-
-                  {/* Grupo 1: 1% LOW (MIN) */}
-                  <div className="flex flex-col items-center gap-3 w-full z-10">
-                    <div className="flex items-end gap-1 md:gap-3 w-full h-48 justify-center">
-                      <div 
-                        className="w-8 md:w-16 bg-cyan-400/80 hover:bg-cyan-400 transition-all rounded-t-sm flex justify-center group relative" 
-                        style={{ height: `${(result1.min_fps / maxFpsValue) * 100}%` }}
-                      >
-                        <span className="absolute -top-6 font-data-display text-sm text-cyan-400 opacity-0 group-hover:opacity-100 transition-opacity">{result1.min_fps}</span>
-                      </div>
-                      <div 
-                        className="w-8 md:w-16 bg-secondary/80 hover:bg-secondary transition-all rounded-t-sm flex justify-center group relative" 
-                        style={{ height: `${(result2.min_fps / maxFpsValue) * 100}%` }}
-                      >
-                        <span className="absolute -top-6 font-data-display text-sm text-secondary opacity-0 group-hover:opacity-100 transition-opacity">{result2.min_fps}</span>
-                      </div>
-                    </div>
-                    <span className="font-label-caps text-[10px] md:text-xs text-slate-400">1% LOW (MIN)</span>
-                  </div>
-
-                  {/* Grupo 2: AVERAGE */}
-                  <div className="flex flex-col items-center gap-3 w-full z-10">
-                    <div className="flex items-end gap-1 md:gap-3 w-full h-48 justify-center">
-                      <div 
-                        className="w-8 md:w-16 bg-cyan-400/80 hover:bg-cyan-400 transition-all rounded-t-sm flex justify-center group relative shadow-[0_0_15px_rgba(0,240,255,0.3)]" 
-                        style={{ height: `${(result1.avg_fps / maxFpsValue) * 100}%` }}
-                      >
-                        <span className="absolute -top-6 font-data-display text-sm text-cyan-400 opacity-0 group-hover:opacity-100 transition-opacity">{result1.avg_fps}</span>
-                      </div>
-                      <div 
-                        className="w-8 md:w-16 bg-secondary/80 hover:bg-secondary transition-all rounded-t-sm flex justify-center group relative shadow-[0_0_15px_var(--secondary-violet)]" 
-                        style={{ height: `${(result2.avg_fps / maxFpsValue) * 100}%` }}
-                      >
-                        <span className="absolute -top-6 font-data-display text-sm text-secondary opacity-0 group-hover:opacity-100 transition-opacity">{result2.avg_fps}</span>
-                      </div>
-                    </div>
-                    <span className="font-label-caps text-[10px] md:text-xs text-white font-bold">AVERAGE</span>
-                  </div>
-
-                  {/* Grupo 3: PEAK (MAX) */}
-                  <div className="flex flex-col items-center gap-3 w-full z-10">
-                    <div className="flex items-end gap-1 md:gap-3 w-full h-48 justify-center">
-                      <div 
-                        className="w-8 md:w-16 bg-cyan-400/80 hover:bg-cyan-400 transition-all rounded-t-sm flex justify-center group relative" 
-                        style={{ height: `${(result1.max_fps / maxFpsValue) * 100}%` }}
-                      >
-                        <span className="absolute -top-6 font-data-display text-sm text-cyan-400 opacity-0 group-hover:opacity-100 transition-opacity">{result1.max_fps}</span>
-                      </div>
-                      <div 
-                        className="w-8 md:w-16 bg-secondary/80 hover:bg-secondary transition-all rounded-t-sm flex justify-center group relative" 
-                        style={{ height: `${(result2.max_fps / maxFpsValue) * 100}%` }}
-                      >
-                        <span className="absolute -top-6 font-data-display text-sm text-secondary opacity-0 group-hover:opacity-100 transition-opacity">{result2.max_fps}</span>
-                      </div>
-                    </div>
-                    <span className="font-label-caps text-[10px] md:text-xs text-slate-400">PEAK (MAX)</span>
-                  </div>
-
-                </div>
-              </GlassCard>
-            </div>
-
-            {/* Resultado Setup 1 (Detalhes) */}
-            <div className="col-span-12 lg:col-span-6">
-              <GlassCard title="SETUP_01_DETAILS" className="relative overflow-hidden">
-                <div className="absolute top-0 left-0 w-1 h-full bg-cyan-500"></div>
-                <div className="space-y-6">
-                  <div className="flex items-baseline gap-3">
-                    <p className="font-label-caps text-[11px] text-slate-500">AVG</p>
-                    <p className="text-4xl font-data-display text-cyan-400">{result1.avg_fps}</p>
-                  </div>
-                  <div className="p-4 bg-black/30 rounded mt-4 border border-white/5">
-                    <p className="text-xs text-slate-400 leading-relaxed font-label-caps tracking-widest">
-                      <span className="text-cyan-400">CPU:</span> {setup1CPU}<br />
-                      <span className="text-cyan-400">GPU:</span> {setup1GPU}<br />
-                      <span className="text-cyan-400">RAM:</span> {setup1RAM}
-                    </p>
-                  </div>
-                </div>
-              </GlassCard>
-            </div>
-
-            {/* Resultado Setup 2 (Detalhes) */}
-            <div className="col-span-12 lg:col-span-6">
-              <GlassCard title="SETUP_02_DETAILS" className="relative overflow-hidden">
-                <div className="absolute top-0 left-0 w-1 h-full bg-secondary"></div>
-                <div className="space-y-6">
-                  <div className="flex items-baseline gap-3">
-                    <p className="font-label-caps text-[11px] text-slate-500">AVG</p>
-                    <p className="text-4xl font-data-display text-secondary">{result2.avg_fps}</p>
-                  </div>
-                  <div className="p-4 bg-black/30 rounded mt-4 border border-white/5">
-                    <p className="text-xs text-slate-400 leading-relaxed font-label-caps tracking-widest">
-                      <span className="text-secondary">CPU:</span> {setup2CPU}<br />
-                      <span className="text-secondary">GPU:</span> {setup2GPU}<br />
-                      <span className="text-secondary">RAM:</span> {setup2RAM}
-                    </p>
-                  </div>
-                </div>
-              </GlassCard>
-            </div>
-          </>
-        )}
-      </DashboardGrid>
+      )}
     </div>
   );
 }

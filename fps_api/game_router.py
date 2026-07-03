@@ -183,7 +183,7 @@ async def recent_global_estimates(request: Request, session: AsyncSession = Depe
     """Busca as 3 últimas estimativas globais usando a ordenação nativa do banco."""
 
     stmt = (
-        select(GameUser, Game.name.label("game_name"))
+        select(GameUser, Game.name.label("game_name"), Game.image_url.label("image_url"))
         .join(Game, Game.id == GameUser.game_id)
         .order_by(GameUser.updated_at.desc())
         .limit(3)
@@ -197,6 +197,7 @@ async def recent_global_estimates(request: Request, session: AsyncSession = Depe
             GameSchema(
                 game_name=game_name,
                 game_id=gu.game_id,
+                image_url=image_url,
                 avg_fps=gu.avg_fps,
                 min_fps=gu.min_fps,
                 max_fps=gu.max_fps,
@@ -204,6 +205,6 @@ async def recent_global_estimates(request: Request, session: AsyncSession = Depe
                 resolution=gu.resolution,
                 upscaling=gu.upscaling,
             )
-            for gu, game_name in recent_games
+            for gu, game_name, image_url in recent_games
         ]
     )
