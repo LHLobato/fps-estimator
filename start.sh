@@ -17,7 +17,7 @@ FRONTEND_PID=""
 BACKEND_LOG_PID=""
 FRONTEND_PORT=""
 
-echo -e "${YELLOW}=== FPS Estimator - Backend Docker + Frontend Vite ===${NC}\n"
+echo -e "${YELLOW}=== FPS-R - Backend Docker + Frontend Vite ===${NC}\n"
 
 cd "$SCRIPT_DIR" || exit 1
 

@@ -41,8 +41,8 @@ function AppLayout() {
       <aside className="fixed left-0 top-0 z-50 hidden h-full w-20 flex-col border-r border-cyan-500/25 bg-slate-950/70 px-3 py-4 shadow-[20px_0_40px_-22px_rgba(0,0,0,0.75)] backdrop-blur-xl lg:flex">
         <Link
           to="/"
-          title="FPS Estimator"
-          aria-label="FPS Estimator home"
+          title="FPS-R"
+          aria-label="FPS-R home"
           className="mb-8 flex h-12 w-12 items-center justify-center overflow-hidden rounded border border-cyan-500/40 bg-slate-950 p-2 text-cyan-300 shadow-[0_0_18px_rgba(0,219,233,0.12)]"
         >
           <img src={APP_LOGO_SRC} alt="" className="h-full w-full object-contain" />

@@ -3,3 +3,4 @@ model/.env
 */__pycache__
 /data/games.csv
 /venv
+/backend.log
