@@ -1,6 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-import sys, os
+import os
+from fastapi.responses import FileResponse
+import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
@@ -59,3 +61,15 @@ app.include_router(auth_router)
 app.include_router(game_router)
 app.include_router(user_router)
 app.include_router(autocomplete_router)
+
+
+FRONTEND_DIST = os.path.join(os.path.dirname(__file__), "..", "client", "dist")
+
+@app.get("/{full_path:path}")
+async def serve_frontend(full_path: str):
+    # Se o arquivo existir de fato (JS, CSS, favicon etc.), serve ele
+    candidate = os.path.join(FRONTEND_DIST, full_path)
+    if full_path and os.path.isfile(candidate):
+        return FileResponse(candidate)
+    # Qualquer outra rota (ex: /profile, /login) é do React Router → cai no index.html
+    return FileResponse(os.path.join(FRONTEND_DIST, "index.html"))
